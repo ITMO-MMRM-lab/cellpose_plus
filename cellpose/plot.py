@@ -10,6 +10,7 @@ from . import utils, io, transforms
 
 try:
     import matplotlib
+
     MATPLOTLIB_ENABLED = True
 except:
     MATPLOTLIB_ENABLED = False
@@ -17,6 +18,7 @@ except:
 try:
     from skimage import color
     from skimage.segmentation import find_boundaries
+
     SKIMAGE_ENABLED = True
 except:
     SKIMAGE_ENABLED = False
@@ -28,20 +30,24 @@ def dx_to_circ(dP):
 
     Args:
         dP (ndarray): Flow field components [dy, dx].
-        
+
     Returns:
         ndarray: The circular color representation of the optic flow.
 
     """
-    mag = 255 * np.clip(transforms.normalize99(np.sqrt(np.sum(dP**2, axis=0))), 0, 1.)
+    mag = 255 * np.clip(transforms.normalize99(np.sqrt(np.sum(dP**2, axis=0))), 0, 1.0)
     angles = np.arctan2(dP[1], dP[0]) + np.pi
     a = 2
     mag /= a
     rgb = np.zeros((*dP.shape[1:], 3), "uint8")
     rgb[..., 0] = np.clip(mag * (np.cos(angles) + 1), 0, 255).astype("uint8")
-    rgb[..., 1] = np.clip(mag * (np.cos(angles + 2 * np.pi / 3) + 1), 0, 255).astype("uint8")
-    rgb[..., 2] = np.clip(mag * (np.cos(angles + 4 * np.pi / 3) + 1), 0, 255).astype("uint8")
-    
+    rgb[..., 1] = np.clip(mag * (np.cos(angles + 2 * np.pi / 3) + 1), 0, 255).astype(
+        "uint8"
+    )
+    rgb[..., 2] = np.clip(mag * (np.cos(angles + 4 * np.pi / 3) + 1), 0, 255).astype(
+        "uint8"
+    )
+
     return rgb
 
 
@@ -62,7 +68,8 @@ def show_segmentation(fig, img, maski, flowi, channels=[0, 0], file_name=None):
     """
     if not MATPLOTLIB_ENABLED:
         raise ImportError(
-            "matplotlib not installed, install with 'pip install matplotlib'")
+            "matplotlib not installed, install with 'pip install matplotlib'"
+        )
     ax = fig.add_subplot(1, 4, 1)
     img0 = img.copy()
 
@@ -159,7 +166,7 @@ def mask_overlay(img, masks, colors=None):
         img = img.astype(np.float32)
 
     HSV = np.zeros((img.shape[0], img.shape[1], 3), np.float32)
-    HSV[:, :, 2] = np.clip((img / 255. if img.max() > 1 else img) * 1.5, 0, 1)
+    HSV[:, :, 2] = np.clip((img / 255.0 if img.max() > 1 else img) * 1.5, 0, 1)
     hues = np.linspace(0, 1, masks.max() + 1)[np.random.permutation(masks.max())]
     for n in range(int(masks.max())):
         ipix = (masks == n + 1).nonzero()
@@ -226,7 +233,7 @@ def interesting_patch(mask, bsize=130):
     xcent = max(bsize // 2, min(x, Lx - bsize // 2))
     patch = [
         np.arange(ycent - bsize // 2, ycent + bsize // 2, 1, int),
-        np.arange(xcent - bsize // 2, xcent + bsize // 2, 1, int)
+        np.arange(xcent - bsize // 2, xcent + bsize // 2, 1, int),
     ]
     return patch
 
@@ -244,9 +251,10 @@ def disk(med, r, Ly, Lx):
         tuple: A tuple containing the y and x coordinates of the pixels within the disk.
 
     """
-    yy, xx = np.meshgrid(np.arange(0, Ly, 1, int), np.arange(0, Lx, 1, int),
-                         indexing="ij")
-    inds = ((yy - med[0])**2 + (xx - med[1])**2)**0.5 <= r
+    yy, xx = np.meshgrid(
+        np.arange(0, Ly, 1, int), np.arange(0, Lx, 1, int), indexing="ij"
+    )
+    inds = ((yy - med[0]) ** 2 + (xx - med[1]) ** 2) ** 0.5 <= r
     y = yy[inds].flatten()
     x = xx[inds].flatten()
     return y, x
@@ -266,19 +274,15 @@ def outline_view(img0, maski, color=[1, 0, 0], mode="inner"):
         numpy.ndarray: The image with the red outline overlay.
 
     """
-    if img0.ndim==2:
+    if img0.ndim == 2:
         img0 = np.stack([img0] * 3, axis=-1)
-    elif img0.ndim!=3:
+    elif img0.ndim != 3:
         raise ValueError("img0 not right size (must have ndim 2 or 3)")
 
     if SKIMAGE_ENABLED:
-        outlines = find_boundaries(
-            maski,
-            mode=mode)
+        outlines = find_boundaries(maski, mode=mode)
     else:
-        outlines = utils.masks_to_outlines(
-            maski,
-            mode=mode)
+        outlines = utils.masks_to_outlines(maski, mode=mode)
     outY, outX = np.nonzero(outlines)
     imgout = img0.copy()
     imgout[outY, outX] = np.array(color)

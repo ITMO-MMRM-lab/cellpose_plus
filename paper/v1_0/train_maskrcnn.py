@@ -17,15 +17,18 @@ Usage: import the module (see Jupyter notebooks for examples), or run from
     # dataset should have a train and test folder
 
 """
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import matplotlib
+
     # Agg backend runs without a display
-    matplotlib.use('Agg')
+    matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
 import os, sys, datetime, glob, pdb
 import numpy as np
-#np.random.bit_generator = np.random._bit_generator
+
+# np.random.bit_generator = np.random._bit_generator
 import skimage.io
 from imgaug import augmenters as iaa
 
@@ -47,9 +50,9 @@ COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
-#dm11_root = '/home/carsen/dm11/'
-dm11_root = '/groups/pachitariu/pachitariulab/'
-basedir = '/groups/pachitariu/home/stringerc/models'  # where to save outputs
+# dm11_root = '/home/carsen/dm11/'
+dm11_root = "/groups/pachitariu/pachitariulab/"
+basedir = "/groups/pachitariu/home/stringerc/models"  # where to save outputs
 DEFAULT_LOGS_DIR = os.path.join(basedir, "logs")
 
 # Results directory
@@ -119,6 +122,25 @@ class NucleusConfig(Config):
 
 
 class NucleusInferenceConfig(NucleusConfig):
+    """
+    Configuration class for inference settings in nucleus detection.
+
+        This class encapsulates configuration parameters used for
+        conducting inference with nucleus detection models. It is
+        designed to optimize performance and resource management during
+        the inference process.
+
+        Attributes:
+            GPU_COUNT: The number of GPUs to be used for inference.
+            IMAGES_PER_GPU: The number of images to process per GPU.
+            IMAGE_RESIZE_MODE: The resizing method to be applied to images.
+            RPN_NMS_THRESHOLD: The non-maximum suppression threshold for the
+                              region proposal network during inference.
+
+        Methods:
+            (No methods defined in this class.)
+    """
+
     # Set batch size to 1 to run one image at a time
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
@@ -136,6 +158,22 @@ import glob
 
 
 class NucleusDataset(utils.Dataset):
+    """
+    A class for handling and processing the Nucleus dataset used in image segmentation tasks.
+
+    This class provides functionality to load the dataset subsets and generate instance masks for images.
+
+    Methods:
+        load_nucleus: Load a subset of the nuclei dataset.
+        load_mask: Generate instance masks for an image.
+        image_reference: Return the path of the image.
+
+    Attributes:
+        dataset_dir: The root directory where the dataset is stored.
+        subset: The specific subset of the dataset being loaded, such as training or validation images.
+
+    The methods allow users to conveniently access the dataset, retrieve masks representing different nuclei instances in an image, and obtain image paths for further processing.
+    """
 
     def load_nucleus(self, dataset_dir, subset):
         """Load a subset of the nuclei dataset.
@@ -154,32 +192,35 @@ class NucleusDataset(utils.Dataset):
         # "val": use hard-coded list above
         # "train": use data from stage1_train minus the hard-coded list above
         # else: use the data from the specified sub-directory
-        fs = glob.glob(os.path.join(dataset_dir, '*_img.tif'))
+        fs = glob.glob(os.path.join(dataset_dir, "*_img.tif"))
         image_ids = np.arange(0, len(fs), 1, int)
-        #assert subset in ["train", "val"]
+        # assert subset in ["train", "val"]
         val = np.zeros(len(image_ids), np.bool)
         val[np.arange(0, len(image_ids), 4, int)] = True
         if subset == "val":
-            image_ids = image_ids[::8]  #np.arange(0,81,1,int)
+            image_ids = image_ids[::8]  # np.arange(0,81,1,int)
         else:
             # Get image ids from directory names
             if subset == "train":
                 image_ids = image_ids[~val]
         # Add images
         for image_id in image_ids:
-            self.add_image("nucleus", image_id=image_id,
-                           path=os.path.join(dataset_dir, "%03d_img.tif" % image_id))
+            self.add_image(
+                "nucleus",
+                image_id=image_id,
+                path=os.path.join(dataset_dir, "%03d_img.tif" % image_id),
+            )
 
     def load_mask(self, image_id):
         """Generate instance masks for an image.
-       Returns:
-        masks: A bool array of shape [height, width, instance count] with
-            one mask per instance.
-        class_ids: a 1D array of class IDs of the instance masks.
+        Returns:
+         masks: A bool array of shape [height, width, instance count] with
+             one mask per instance.
+         class_ids: a 1D array of class IDs of the instance masks.
         """
         info = self.image_info[image_id]
         # Get mask directory from image path
-        m = skimage.io.imread(info['path'][:-7] + 'masks.tif')
+        m = skimage.io.imread(info["path"][:-7] + "masks.tif")
         mask = []
         for k in range(m.max()):
             mask.append(m == (k + 1))
@@ -222,12 +263,12 @@ def train(model, dataset_dir):
             iaa.Fliplr(0.5),
             iaa.Flipud(0.5),
             iaa.OneOf(
-                [iaa.Affine(rotate=90),
-                 iaa.Affine(rotate=180),
-                 iaa.Affine(rotate=270)]),
+                [iaa.Affine(rotate=90), iaa.Affine(rotate=180), iaa.Affine(rotate=270)]
+            ),
             iaa.Multiply((0.5, 1.5)),
-            #iaa.GaussianBlur(sigma=(0.0, 5.0))
-        ])
+            # iaa.GaussianBlur(sigma=(0.0, 5.0))
+        ],
+    )
 
     # *** This training schedule is an example. Update to your needs ***
 
@@ -240,7 +281,7 @@ def train(model, dataset_dir):
         learning_rate=config.LEARNING_RATE,
         epochs=config.HEAD_EPOCHS,
         augmentation=augmentation,
-        layers='heads',
+        layers="heads",
     )
 
     print("Train all layers")
@@ -250,7 +291,7 @@ def train(model, dataset_dir):
         learning_rate=config.LEARNING_RATE,
         epochs=config.TRAIN_EPOCHS,
         augmentation=augmentation,
-        layers='all',
+        layers="all",
     )
 
 
@@ -323,9 +364,9 @@ def mask_to_rle(image_id, mask, scores):
 def detect(model, dataset_dir, RESULTS_DIR=RESULTS_DIR):
     """Run detection on images in the given directory."""
     print("Running on {}".format(dataset_dir))
-    #config.BATCH_SIZE = 1
-    #config.IMAGES_PER_GPU = 1
-    #config.GPU_COUNT = 1
+    # config.BATCH_SIZE = 1
+    # config.IMAGES_PER_GPU = 1
+    # config.GPU_COUNT = 1
     # Create directory
     if not os.path.exists(RESULTS_DIR):
         os.makedirs(RESULTS_DIR)
@@ -335,7 +376,7 @@ def detect(model, dataset_dir, RESULTS_DIR=RESULTS_DIR):
 
     # Read dataset
     dataset = NucleusDataset()
-    dataset.load_nucleus(dataset_dir, '')
+    dataset.load_nucleus(dataset_dir, "")
     dataset.prepare()
     # Load over images
     submission = []
@@ -346,21 +387,21 @@ def detect(model, dataset_dir, RESULTS_DIR=RESULTS_DIR):
         # Detect objects
         r = model.detect([image], verbose=0)[0]
         # Encode image to RLE. Returns a string of multiple lines
-        #source_id = dataset.image_info[image_id]["id"]
-        #rle = mask_to_rle(source_id, r["masks"], r["scores"])
+        # source_id = dataset.image_info[image_id]["id"]
+        # rle = mask_to_rle(source_id, r["masks"], r["scores"])
         masks.append(r["masks"])
-        #submission.append(rle)
+        # submission.append(rle)
         # Save image with masks
-        #visualize.display_instances(
+        # visualize.display_instances(
         #    image, r['rois'], r['masks'], r['class_ids'],
         #    dataset.class_names, r['scores'],
         #    show_bbox=False, show_mask=False,
         #    title="Predictions")
-        #plt.savefig("{}/{}.png".format(submit_dir, dataset.image_info[image_id]["id"]))
+        # plt.savefig("{}/{}.png".format(submit_dir, dataset.image_info[image_id]["id"]))
 
     # Save to npy file
     file_path = os.path.join(submit_dir, "overlapping_masks.npy")
-    np.save(file_path, {'masks': masks})
+    np.save(file_path, {"masks": masks})
 
     print("Saved to ", submit_dir)
 
@@ -368,42 +409,72 @@ def detect(model, dataset_dir, RESULTS_DIR=RESULTS_DIR):
 
 
 def remove_overlaps(masks, cellpix, medians):
-    """ replace overlapping mask pixels with mask id of closest mask
-        masks = Nmasks x Ly x Lx
+    """replace overlapping mask pixels with mask id of closest mask
+    masks = Nmasks x Ly x Lx
     """
     overlaps = np.array(np.nonzero(cellpix > 1.5)).T
-    dists = ((overlaps[:, :, np.newaxis] - medians.T)**2).sum(axis=1)
+    dists = ((overlaps[:, :, np.newaxis] - medians.T) ** 2).sum(axis=1)
     tocell = np.argmin(dists, axis=1)
     masks[:, overlaps[:, 0], overlaps[:, 1]] = 0
     masks[tocell, overlaps[:, 0], overlaps[:, 1]] = 1
 
     # labels should be 1 to mask.shape[0]
-    masks = masks.astype(int) * np.arange(1, masks.shape[0] + 1, 1, int)[:, np.newaxis,
-                                                                         np.newaxis]
+    masks = (
+        masks.astype(int)
+        * np.arange(1, masks.shape[0] + 1, 1, int)[:, np.newaxis, np.newaxis]
+    )
     masks = masks.sum(axis=0)
     return masks
 
 
 def compute_batch_ap(dataset, image_ids, verbose=1):
+    """
+    Compute the average precision (AP) for a batch of images.
+
+        This method iterates through the specified image IDs, loads each image,
+        performs object detection, and calculates the average precision
+        at different IoU thresholds ranging from 0.5 to 0.95.
+
+        Args:
+            dataset: The dataset containing the images and their annotations.
+            image_ids: A list of image identifiers to process.
+            verbose: An optional parameter that controls the level of output
+                     information printed to the console (default is 1).
+
+        Returns:
+            A list of average precision scores for each processed image.
+    """
     APs = []
     for image_id in image_ids:
         # Load image
-        image, image_meta, gt_class_id, gt_bbox, gt_mask =\
-            modellib.load_image_gt(dataset, config,
-                                   image_id, use_mini_mask=False)
+        image, image_meta, gt_class_id, gt_bbox, gt_mask = modellib.load_image_gt(
+            dataset, config, image_id, use_mini_mask=False
+        )
         # Run object detection
-        results = model.detect_molded(image[np.newaxis], image_meta[np.newaxis],
-                                      verbose=0)
+        results = model.detect_molded(
+            image[np.newaxis], image_meta[np.newaxis], verbose=0
+        )
         # Compute AP over range 0.5 to 0.95
         r = results[0]
-        ap = utils.compute_ap_range(gt_bbox, gt_class_id, gt_mask, r['rois'],
-                                    r['class_ids'], r['scores'], r['masks'], verbose=0)
+        ap = utils.compute_ap_range(
+            gt_bbox,
+            gt_class_id,
+            gt_mask,
+            r["rois"],
+            r["class_ids"],
+            r["scores"],
+            r["masks"],
+            verbose=0,
+        )
         APs.append(ap)
         if verbose:
             info = dataset.image_info[image_id]
             meta = modellib.parse_image_meta(image_meta[np.newaxis, ...])
-            print("{:3} {}   AP: {:.2f}".format(meta["image_id"][0],
-                                                meta["original_image_shape"][0], ap))
+            print(
+                "{:3} {}   AP: {:.2f}".format(
+                    meta["image_id"][0], meta["original_image_shape"][0], ap
+                )
+            )
     return APs
 
 
@@ -411,23 +482,42 @@ def compute_batch_ap(dataset, image_ids, verbose=1):
 #  Command Line
 ############################################################
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(
-        description='Mask R-CNN for nuclei counting and segmentation')
-    parser.add_argument('--dataset', required=False, metavar="/path/to/dataset/",
-                        help='Root directory of the dataset')
-    parser.add_argument('--weights', required=True, metavar="/path/to/weights.h5",
-                        help="Path to weights .h5 file or 'coco'")
-    parser.add_argument('--logs', required=False, default=DEFAULT_LOGS_DIR,
-                        metavar="/path/to/logs/",
-                        help='Logs and checkpoints directory (default=logs/)')
-    parser.add_argument('--LR', default=0.001, type=float, required=False,
-                        metavar="learning rate", help="initial learning rate")
-    parser.add_argument('--nepochs', default=200, type=int, help='number of epochs')
-    parser.add_argument('--batch_size', default=2, type=int, help='batch_size')
+        description="Mask R-CNN for nuclei counting and segmentation"
+    )
+    parser.add_argument(
+        "--dataset",
+        required=False,
+        metavar="/path/to/dataset/",
+        help="Root directory of the dataset",
+    )
+    parser.add_argument(
+        "--weights",
+        required=True,
+        metavar="/path/to/weights.h5",
+        help="Path to weights .h5 file or 'coco'",
+    )
+    parser.add_argument(
+        "--logs",
+        required=False,
+        default=DEFAULT_LOGS_DIR,
+        metavar="/path/to/logs/",
+        help="Logs and checkpoints directory (default=logs/)",
+    )
+    parser.add_argument(
+        "--LR",
+        default=0.001,
+        type=float,
+        required=False,
+        metavar="learning rate",
+        help="initial learning rate",
+    )
+    parser.add_argument("--nepochs", default=200, type=int, help="number of epochs")
+    parser.add_argument("--batch_size", default=2, type=int, help="batch_size")
 
     args = parser.parse_args()
 
@@ -440,15 +530,15 @@ if __name__ == '__main__':
 
     print("Weights: ", args.weights)
     dataset = os.path.basename(os.path.normpath(args.dataset))
-    dataset_train = os.path.join(args.dataset, 'train/')
-    dataset_test = os.path.join(args.dataset, 'test/')
+    dataset_train = os.path.join(args.dataset, "train/")
+    dataset_test = os.path.join(args.dataset, "test/")
     print("Dataset: ", dataset)
     print("Logs: ", args.logs)
 
-    fs = glob.glob(os.path.join(dataset_train, '*_img.tif'))
+    fs = glob.glob(os.path.join(dataset_train, "*_img.tif"))
     ntrain = len(fs)
     nval = ntrain // 8
-    print('ntrain %d nval %d' % (ntrain, nval))
+    print("ntrain %d nval %d" % (ntrain, nval))
     # Configurations
     config = NucleusConfig()
     config.BATCH_SIZE = batch_size
@@ -491,15 +581,17 @@ if __name__ == '__main__':
         # Exclude the last layers because they require a matching
         # number of classes
         model.load_weights(
-            weights_path, by_name=True,
-            exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"])
+            weights_path,
+            by_name=True,
+            exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"],
+        )
     else:
         model.load_weights(weights_path, by_name=True)
 
     # train model
 
     train(model, dataset_train)
-    #pdb.set_trace()
+    # pdb.set_trace()
     weights_path = model.checkpoint_path.format(epoch=model.epoch)
     print(weights_path)
     # reload model in inference mode
@@ -511,11 +603,11 @@ if __name__ == '__main__':
     overlapping_masks = detect(model, dataset_test)
 
     # score output
-    #ndataset = NucleusDataset()
-    #ndataset.load_nucleus(dataset_test, '')
-    #ndataset.prepare()
-    #APs = compute_batch_ap(ndataset, ndataset.image_ids)
-    #print("Mean AP overa {} images: {:.4f}".format(len(APs), np.mean(APs)))
+    # ndataset = NucleusDataset()
+    # ndataset.load_nucleus(dataset_test, '')
+    # ndataset.prepare()
+    # APs = compute_batch_ap(ndataset, ndataset.image_ids)
+    # print("Mean AP overa {} images: {:.4f}".format(len(APs), np.mean(APs)))
 
     masks = []
     for i in range(len(overlapping_masks)):
@@ -526,10 +618,14 @@ if __name__ == '__main__':
             medians.append(np.array([ypix.mean(), xpix.mean()]))
         masks.append(
             np.int32(
-                remove_overlaps(np.transpose(mask, (2, 0, 1)), mask.sum(axis=-1),
-                                np.array(medians))))
-    mlist = glob.glob(os.path.join(dataset_test, '*_masks.tif'))
+                remove_overlaps(
+                    np.transpose(mask, (2, 0, 1)), mask.sum(axis=-1), np.array(medians)
+                )
+            )
+        )
+    mlist = glob.glob(os.path.join(dataset_test, "*_masks.tif"))
     Y_test = [skimage.io.imread(fimg) + 1 for fimg in mlist]
-    rez = matching.matching_dataset(Y_test, masks, thresh=[0.5, 0.75, .9],
-                                    by_image=True)
+    rez = matching.matching_dataset(
+        Y_test, masks, thresh=[0.5, 0.75, 0.9], by_image=True
+    )
     print(rez)

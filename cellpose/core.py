@@ -22,8 +22,9 @@ TORCH_ENABLED = True
 core_logger = logging.getLogger(__name__)
 tqdm_out = utils.TqdmToLogger(core_logger, level=logging.INFO)
 
+
 def use_gpu(gpu_number=0, use_torch=True):
-    """ 
+    """
     Check if GPU is available for use.
 
     Args:
@@ -54,18 +55,18 @@ def _use_gpu_torch(gpu_number=0):
     """
     try:
         device = torch.device("cuda:" + str(gpu_number))
-        _ = torch.zeros((1,1)).to(device)
+        _ = torch.zeros((1, 1)).to(device)
         core_logger.info("** TORCH CUDA version installed and working. **")
         return True
     except:
         pass
     try:
-        device = torch.device('mps:' + str(gpu_number))
-        _ = torch.zeros((1,1)).to(device)
-        core_logger.info('** TORCH MPS version installed and working. **')
+        device = torch.device("mps:" + str(gpu_number))
+        _ = torch.zeros((1, 1)).to(device)
+        core_logger.info("** TORCH MPS version installed and working. **")
         return True
     except:
-        core_logger.info('Neither TORCH CUDA nor MPS version not installed/working.')
+        core_logger.info("Neither TORCH CUDA nor MPS version not installed/working.")
         return False
 
 
@@ -83,12 +84,12 @@ def assign_device(use_torch=True, gpu=False, device=0):
     """
 
     if isinstance(device, str):
-        if device != "mps" or not(gpu and torch.backends.mps.is_available()):
+        if device != "mps" or not (gpu and torch.backends.mps.is_available()):
             device = int(device)
     if gpu and use_gpu(use_torch=True):
         try:
             if torch.cuda.is_available():
-                device = torch.device(f'cuda:{device}')
+                device = torch.device(f"cuda:{device}")
                 core_logger.info(">>>> using GPU (CUDA)")
                 gpu = True
                 cpu = False
@@ -97,7 +98,7 @@ def assign_device(use_torch=True, gpu=False, device=0):
             cpu = True
         try:
             if torch.backends.mps.is_available():
-                device = torch.device('mps')
+                device = torch.device("mps")
                 core_logger.info(">>>> using GPU (MPS)")
                 gpu = True
                 cpu = False
@@ -105,11 +106,11 @@ def assign_device(use_torch=True, gpu=False, device=0):
             gpu = False
             cpu = True
     else:
-        device = torch.device('cpu')
-        core_logger.info('>>>> using CPU')
+        device = torch.device("cpu")
+        core_logger.info(">>>> using CPU")
         gpu = False
         cpu = True
-    
+
     if cpu:
         device = torch.device("cpu")
         core_logger.info(">>>> using CPU")
@@ -135,7 +136,8 @@ def check_mkl(use_torch=True):
             "WARNING: MKL version on torch not working/installed - CPU version will be slightly slower."
         )
         core_logger.info(
-            "see https://pytorch.org/docs/stable/backends.html?highlight=mkl")
+            "see https://pytorch.org/docs/stable/backends.html?highlight=mkl"
+        )
     return mkl_enabled
 
 
@@ -193,11 +195,12 @@ def _forward(net, x):
     return y, style
 
 
-def run_net(net, imgi, batch_size=8, augment=False, tile_overlap=0.1, bsize=224,
-            rsz=None):
-    """ 
+def run_net(
+    net, imgi, batch_size=8, augment=False, tile_overlap=0.1, bsize=224, rsz=None
+):
+    """
     Run network on stack of images.
-    
+
     (faster if augment is False)
 
     Args:
@@ -211,12 +214,12 @@ def run_net(net, imgi, batch_size=8, augment=False, tile_overlap=0.1, bsize=224,
 
     Returns:
         Tuple[numpy.ndarray, numpy.ndarray]: outputs of network y and style. If tiled `y` is averaged in tile overlaps. Size of [Ly x Lx x 3] or [Lz x Ly x Lx x 3].
-            y[...,0] is Y flow; y[...,1] is X flow; y[...,2] is cell probability. 
+            y[...,0] is Y flow; y[...,1] is X flow; y[...,2] is cell probability.
             style is a 1D array of size 256 summarizing the style of the image, if tiled `style` is averaged over tiles.
     """
     # run network
     nout = net.nout
-    Lz, Ly0, Lx0, nchan = imgi.shape 
+    Lz, Ly0, Lx0, nchan = imgi.shape
     if rsz is not None:
         if not isinstance(rsz, list) and not isinstance(rsz, np.ndarray):
             rsz = [rsz, rsz]
@@ -227,35 +230,43 @@ def run_net(net, imgi, batch_size=8, augment=False, tile_overlap=0.1, bsize=224,
     pads = np.array([[0, 0], [ypad1, ypad2], [xpad1, xpad2]])
     Ly, Lx = Lyr + ypad1 + ypad2, Lxr + xpad1 + xpad2
     if augment:
-        ny = max(2, int(np.ceil(2. * Ly / bsize)))
-        nx = max(2, int(np.ceil(2. * Lx / bsize)))
+        ny = max(2, int(np.ceil(2.0 * Ly / bsize)))
+        nx = max(2, int(np.ceil(2.0 * Lx / bsize)))
         ly, lx = bsize, bsize
     else:
-        ny = 1 if Ly <= bsize else int(np.ceil((1. + 2 * tile_overlap) * Ly / bsize))
-        nx = 1 if Lx <= bsize else int(np.ceil((1. + 2 * tile_overlap) * Lx / bsize))
+        ny = 1 if Ly <= bsize else int(np.ceil((1.0 + 2 * tile_overlap) * Ly / bsize))
+        nx = 1 if Lx <= bsize else int(np.ceil((1.0 + 2 * tile_overlap) * Lx / bsize))
         ly, lx = min(bsize, Ly), min(bsize, Lx)
     yf = np.zeros((Lz, nout, Ly, Lx), "float32")
     styles = np.zeros((Lz, 256), "float32")
-    
+
     # run multiple slices at the same time
     ntiles = ny * nx
-    nimgs = max(1, batch_size // ntiles) # number of imgs to run in the same batch
+    nimgs = max(1, batch_size // ntiles)  # number of imgs to run in the same batch
     niter = int(np.ceil(Lz / nimgs))
-    ziterator = (trange(niter, file=tqdm_out, mininterval=30) 
-                    if niter > 10 or Lz > 1 else range(niter))
+    ziterator = (
+        trange(niter, file=tqdm_out, mininterval=30)
+        if niter > 10 or Lz > 1
+        else range(niter)
+    )
     for k in ziterator:
         inds = np.arange(k * nimgs, min(Lz, (k + 1) * nimgs))
         IMGa = np.zeros((ntiles * len(inds), nchan, ly, lx), "float32")
         for i, b in enumerate(inds):
             # pad image for net so Ly and Lx are divisible by 4
-            imgb = transforms.resize_image(imgi[b], rsz=rsz) if rsz is not None else imgi[b].copy()
-            imgb = np.pad(imgb.transpose(2,0,1), pads, mode="constant")
+            imgb = (
+                transforms.resize_image(imgi[b], rsz=rsz)
+                if rsz is not None
+                else imgi[b].copy()
+            )
+            imgb = np.pad(imgb.transpose(2, 0, 1), pads, mode="constant")
             IMG, ysub, xsub, Ly, Lx = transforms.make_tiles(
-                imgb, bsize=bsize, augment=augment,
-                tile_overlap=tile_overlap)
-            IMGa[i * ntiles : (i+1) * ntiles] = np.reshape(IMG, 
-                                            (ny * nx, nchan, ly, lx))
-        
+                imgb, bsize=bsize, augment=augment, tile_overlap=tile_overlap
+            )
+            IMGa[i * ntiles : (i + 1) * ntiles] = np.reshape(
+                IMG, (ny * nx, nchan, ly, lx)
+            )
+
         ya = np.zeros((IMGa.shape[0], nout, ly, lx), "float32")
         stylea = np.zeros((IMGa.shape[0], 256), "float32")
         for j in range(0, IMGa.shape[0], batch_size):
@@ -268,22 +279,29 @@ def run_net(net, imgi, batch_size=8, augment=False, tile_overlap=0.1, bsize=224,
                 y = transforms.unaugment_tiles(y)
                 y = np.reshape(y, (-1, 3, ly, lx))
             yfi = transforms.average_tiles(y, ysub, xsub, Ly, Lx)
-            yf[b] = yfi[:, :imgb.shape[-2], :imgb.shape[-1]]
-            stylei = stylea[i * ntiles:(i + 1) * ntiles].sum(axis=0)
-            stylei /= (stylei**2).sum()**0.5
+            yf[b] = yfi[:, : imgb.shape[-2], : imgb.shape[-1]]
+            stylei = stylea[i * ntiles : (i + 1) * ntiles].sum(axis=0)
+            stylei /= (stylei**2).sum() ** 0.5
             styles[b] = stylei
     # slices from padding
-    yf = yf[:, :, ypad1 : Ly-ypad2, xpad1 : Lx-xpad2]
-    yf = yf.transpose(0,2,3,1)   
+    yf = yf[:, :, ypad1 : Ly - ypad2, xpad1 : Lx - xpad2]
+    yf = yf.transpose(0, 2, 3, 1)
     return yf, np.array(styles)
 
 
-def run_3D(net, imgs, batch_size=8, augment=False,
-           tile_overlap=0.1, bsize=224, net_ortho=None,
-           progress=None):
-    """ 
+def run_3D(
+    net,
+    imgs,
+    batch_size=8,
+    augment=False,
+    tile_overlap=0.1,
+    bsize=224,
+    net_ortho=None,
+    progress=None,
+):
+    """
     Run network on image z-stack.
-    
+
     (faster if augment is False)
 
     Args:
@@ -299,7 +317,7 @@ def run_3D(net, imgs, batch_size=8, augment=False,
 
     Returns:
         Tuple[numpy.ndarray, numpy.ndarray]: outputs of network y and style. If tiled `y` is averaged in tile overlaps. Size of [Ly x Lx x 3] or [Lz x Ly x Lx x 3].
-            y[...,0] is Z flow; y[...,1] is Y flow; y[...,2] is X flow; y[...,3] is cell probability. 
+            y[...,0] is Z flow; y[...,1] is Y flow; y[...,2] is X flow; y[...,3] is cell probability.
             style is a 1D array of size 256 summarizing the style of the image, if tiled `style` is averaged over tiles.
     """
     sstr = ["YX", "ZY", "ZX"]
@@ -308,23 +326,31 @@ def run_3D(net, imgs, batch_size=8, augment=False,
     cp = [(1, 2), (0, 2), (0, 1)]
     cpy = [(0, 1), (0, 1), (0, 1)]
     shape = imgs.shape[:-1]
-    #cellprob = np.zeros(shape, "float32")
+    # cellprob = np.zeros(shape, "float32")
     yf = np.zeros((*shape, 4), "float32")
     for p in range(3):
         xsl = imgs.transpose(pm[p])
         # per image
-        core_logger.info("running %s: %d planes of size (%d, %d)" %
-                         (sstr[p], shape[pm[p][0]], shape[pm[p][1]], shape[pm[p][2]]))
-        y, style = run_net(net if p==0 or net_ortho is None else net_ortho, 
-                           xsl, batch_size=batch_size, augment=augment, 
-                           bsize=bsize, tile_overlap=tile_overlap, 
-                           rsz=None)
+        core_logger.info(
+            "running %s: %d planes of size (%d, %d)"
+            % (sstr[p], shape[pm[p][0]], shape[pm[p][1]], shape[pm[p][2]])
+        )
+        y, style = run_net(
+            net if p == 0 or net_ortho is None else net_ortho,
+            xsl,
+            batch_size=batch_size,
+            augment=augment,
+            bsize=bsize,
+            tile_overlap=tile_overlap,
+            rsz=None,
+        )
         yf[..., -1] += y[..., -1].transpose(ipm[p])
         for j in range(2):
             yf[..., cp[p][j]] += y[..., cpy[p][j]].transpose(ipm[p])
-        y = None; del y
-    
+        y = None
+        del y
+
         if progress is not None:
             progress.setValue(25 + 15 * p)
-    
+
     return yf, style
