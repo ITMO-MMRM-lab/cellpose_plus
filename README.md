@@ -1,146 +1,149 @@
-# <p>  <b>Cellpose plus</b> </p>
+# cellpose_plus
 
-<!-- [![Documentation Status](https://readthedocs.org/projects/cellpose/badge/?version=latest)](https://cellpose.readthedocs.io/en/latest/?badge=latest) -->
-[![PyPI version](https://badge.fury.io/py/cellpose-plus.svg)](https://badge.fury.io/py/cellpose-plus)
-[![Downloads](https://pepy.tech/badge/cellpose-plus)](https://pepy.tech/project/cellpose-plus)
-[![Downloads](https://pepy.tech/badge/cellpose-plus/month)](https://pepy.tech/project/cellpose-plus)
-[![Python version](https://img.shields.io/pypi/pyversions/cellpose-plus)](https://pypistats.org/packages/cellpose-plus)
-[![Licence: GPL v3](https://img.shields.io/github/license/ITMO-MMRM-lab/cellpose)](https://github.com/ITMO-MMRM-lab/cellpose/blob/master/LICENSE)
-<!-- [![Contributors](https://img.shields.io/github/contributors-anon/ITMO-MMRM-lab/cellpose)](https://github.com/ITMO-MMRM-lab/cellpose/graphs/contributors) -->
-<!-- [![website](https://img.shields.io/website?url=https%3A%2F%2Fwww.cellpose.org)](https://www.cellpose.org) -->
-[![repo size](https://img.shields.io/github/repo-size/ITMO-MMRM-lab/cellpose)](https://github.com/ITMO-MMRM-lab/cellpose/)
-<!-- [![GitHub stars](https://img.shields.io/github/stars/ITMO-MMRM-lab/cellpose?style=social)](https://github.com/ITMO-MMRM-lab/cellpose/) -->
-<!-- [![GitHub forks](https://img.shields.io/github/forks/ITMO-MMRM-lab/cellpose?style=social)](https://github.com/ITMO-MMRM-lab/cellpose/) -->
+---
 
-Cellpose plus is a morphological analysis tool that builds on a forked branch of the state-of-the-art image segmentation framework [Cellpose](https://github.com/MouseLand/cellpose). 
-We add feature extraction algorithms to asses morphological properties of cells and nuclei. This way we achieve a single workflow to study stained cells, from raw images to labeled masks with their corresponding measures. \
-As the main Cellpose branch continues to grow actively, we aim to keep our forked repository up to date. The latest additions and bug fixes are also present in our repository.
+[![PyPi](https://badge.fury.io/py/cellpose_plus.svg)](https://badge.fury.io/py/cellpose_plus)
+![License](https://img.shields.io/github/license/ITMO-MMRM-lab/cellpose_plus?style=flat&logo=opensourceinitiative&logoColor=white&color=blue)
+[![OSA-improved](https://img.shields.io/badge/improved%20by-OSA-yellow)](https://github.com/aimclub/OSA)
 
-Developed by the InfoChemistry scientific center, part of ITMO University.
+---
 
-### Installation
+## Overview
 
-We suggest installing our fork using `conda` and `pip` (with `python>=3.8`).
+Cellpose Plus is a comprehensive tool designed for the morphological analysis of stained cell images, enabling users to extract critical features related to cell structure and organization. Its seamless workflow allows for efficient processing from raw images to insightful metrics, facilitating advanced study in cell biology and research.
 
-1. Install [Anaconda](https://www.anaconda.com/download/).
-2. Open an `anaconda` prompt / command prompt which has conda for python 3 in the path.
-3. For a new environment for CPU only, run:\
- `conda create -n cellpose_plus 'python==3.9' pytorch`
-4. To activate the new environment, run `conda activate cellpose_plus`
-5. For NVIDIA GPUs, run:\
- `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126` \
-   If there are problems with the latest version, we suggest to install CUDA 11.8
-6. To install the latest PyPi release of Cellpose plus and its dependencies (see [setup.py](https://github.com/ITMO-MMRM-lab/cellpose/blob/main/setup.py)), run:\
-  `pip install cellpose-plus[gui]`\
-  or `pip install cellpose-plus` for a version without GUI.
-(Optional): To install dependencies, you can use requirements.txt via `pip install -r /cellpose_plus/requirements.txt`
+---
 
-### System requirements
+## Table of Contents
 
-Linux, Windows and Mac OS are supported for running the code. For running the graphical interface you will need a Mac OS later than Yosemite. At least 8GB of RAM is required to run the software. 16GB-32GB may be required for larger images. The software has been tested on Windows 10, Windows 11, Ubuntu 24.04, Manjaro and limitedly tested on Mac OS.
+- [Core features](#core-features)
+- [Installation](#installation)
+- [Getting Started](#getting-started)
+- [Examples](#examples)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
+- [Citation](#citation)
 
-### New features
-As a novelty, we contribute with the addition of capabilities to calculate the following metrics:
+---
+## Core features
 
-* Area of subject (𝜇𝑚²).
-* Roundness (0.0 - 1.0), having 1.0 for a perfect circle.
-* Size ratio between each pair of cell and nucleus.
-* Fraction of image covered by cells/nuclei.
-* Relative center coordinates.
-* Voronoi diagram based on the centers.
-* Voronoi entropy, a measure of order/chaos in the cells' positions.
-* Convex hull of all objects.
-* Continuous symmetry measure (CSM). 
+1. **Morphological Analysis Tool**: Cellpose Plus is primarily designed for morphological analysis of stained cell images, enabling users to extract detailed features related to cell structure and organization.
+2. **Image Segmentation**: Utilizes advanced segmentation techniques to accurately differentiate between cells and nuclei in various cell images, leveraging a forking of the Cellpose framework for enhanced capabilities.
+3. **Feature Extraction Algorithms**: Includes multiple algorithms to extract specific morphological features such as area, roundness, and center coordinates of cells and nuclei after segmentation.
+4. **Single Workflow Processing**: Provides a comprehensive workflow from raw image input to output metrics, enabling users to efficiently manage and process stained cell images without switching tools.
 
-### General workflow
+---
 
-<!-- ![Cellpose Plus](repo/workflow.png) -->
-<img src="https://raw.githubusercontent.com/ITMO-MMRM-lab/cellpose/refs/heads/main/repo/workflow.png" width="800" />
+## Installation
 
-In order to obtain metrics from segmented cells, the initial stained images are merged into a
-single image and organized into sub folders to be processed. A cell segmentation
-procedure is performed using [Cellpose](https://github.com/MouseLand/cellpose), then we extract the metrics 
-and finally we store the results in the form of images and CSV files.
+Install cellpose_plus using one of the following methods:
 
+**Using PyPi:**
 
-### Try out online!
+```sh
+pip install cellpose_plus
+```
 
-You can run Cellpose plus in Google Colab with a GPU: 
-* We provide a commented code-based example notebook: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1_yDbBQb0Ndc4QcTvONOUbfVziwB6Ykev?authuser=1#scrollTo=imGtXZPMu_al) showing each part of our workflow.
+---
 
+To install the package using `conda`, follow these steps:
+1. Open an `anaconda` prompt or command prompt.
+2. Create a new environment for CPU only:
+```bash
+   conda create -n cellpose_plus 'python==3.9' pytorch
+```
+3. Activate the new environment:
+```bash
+   conda activate cellpose_plus
+```
+4. For NVIDIA GPUs, run:
+```bash
+   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+```
+5. Finally, install Cellpose Plus:
+```bash
+   pip install cellpose-plus[gui]
+```
+## Getting Started
 
-### How to use
+To get started with Cellpose Plus, you need to run it for segmentation tasks. Here are the steps to use it:
 
-Launching Cellpose plus GUI: 
+### Running Cellpose Plus
+To run Cellpose Plus using the GUI, follow these steps:
+1. Launch the command line terminal/Anaconda Prompt.
+2. Activate the environment you created:
+```bash
+   conda activate cellpose_plus
+```
+3. Launch the GUI:
+```bash
+   python -m cellpose
+```
+4. Drag and drop your desired image for segmentation.
 
-- Launch the command line terminal/Anaconda Prompt: 
-- Activate respective environments *conda activite __your_environment__*  (e.g. `conda activate cellpose_plus`) 
-- Enter to launch the GUI `python -m cellpose`
-- Now, you can load or drag-drop your desired image for segmentation
+### Important Note
+Make sure to set a pixel-to-micrometer (μm) conversion value (μm per pixel) in the GUI to calculate the areas correctly.
 
-Further, we present a usage example:
-
+### Example Usage
 ![demo_gif](https://raw.githubusercontent.com/ITMO-MMRM-lab/cellpose/refs/heads/main/repo/demo_cellpose_plus.gif)
-<!-- <img src="repo/cellpose_gui.png" width="800" /> -->
+After the segmentation process, save the masks in a folder with the same name as the image and analyze results in CSV format.
 
-**IMPORTANT**: It’s mandatory to set a pixel-to-micrometer(μm) conversion value (μm per pixel), in order to calculate the cells/nuclei area. The input field for this value in the GUI, is named as “Length in μm”. By default this value is automatically acquired if the corresponding metadata file (generated by the microscope after image obtaining) is present in the same folder as the image, and if it shares the same name of the image + ”_Properties.xml”.
+You can also experiment with the feature extraction metrics in the Cellpose plus workflow by referring to the online example provided via Google Colab:
+[Open In Colab](https://colab.research.google.com/drive/1_yDbBQb0Ndc4QcTvONOUbfVziwB6Ykev?authuser=1#scrollTo=imGtXZPMu_al).
 
-After the segmentation process, possibly including manual editing of the masks, we can save the masks in a folder with the same name as the image and place them in the same location by clicking the "Save labeled  mask" button. If we want to calculate metrics for the current segmentation, we can save it as a snapshot by clicking the "Save mask temporarily" button.
+---
 
-<img src="https://raw.githubusercontent.com/ITMO-MMRM-lab/cellpose/refs/heads/main/repo/mask_menu.png" width="300" />
+## Examples
 
-In the image below, we can see a saved snapshot from a mask calculated using a `cyto3` model. As it is the first snapshot from this model, the final snapshot name is `cyto3_1`.
+Examples of how this should work and how it should be used are available [here](https://github.com/ITMO-MMRM-lab/cellpose_plus/tree/main/docs/notebook.rst).
 
-<img src="https://raw.githubusercontent.com/ITMO-MMRM-lab/cellpose/refs/heads/main/repo/mask_type_selection.png" width="450" />
+---
 
-Each snapshot should represent the segmentation of a subject type (cytoplasm or nuclei), to define this, we select one of the options pictured above (main or secondary mask). Here, we see an example of `cyto3_1` selected as the main mask and `nuclei_1` as the secondary mask.
+## Documentation
 
-<img src="https://raw.githubusercontent.com/ITMO-MMRM-lab/cellpose/refs/heads/main/repo/mask_snapshots.png" width="300" />
+A detailed cellpose_plus description is available [here](https://github.com/ITMO-MMRM-lab/cellpose_plus/tree/main/docs).
 
-At the bottom of the GUI, we find the metrics panel with the following options: \
-Area and roundness are clickable when having a snapshot selected as primary. If there is a primary and a secondary snapshot available, the values are calculated separately per subject (cells and/or nuclei).
-Ratio and Voronoi are clickable when having a primary and a secondary snapshot selected. To obtain results, both snapshots are necessary.
+---
 
-<img src="https://raw.githubusercontent.com/ITMO-MMRM-lab/cellpose/refs/heads/main/repo/metrics_panel.png" width="300" />
+## Contributing
 
-After clicking "calculate" it will take a few moments until we get a folder with the same name as the source image, containing the result values ​​in .csv and .png formats. For extra feedback about the processes and alerts, we suggest to stay pending of the python shell.
+- **[Report Issues](https://github.com/ITMO-MMRM-lab/cellpose_plus/issues)**: Submit bugs found or log feature requests for the project.
 
-<img src="https://raw.githubusercontent.com/ITMO-MMRM-lab/cellpose/refs/heads/main/repo/results_folder_example.png" width="850" />
+---
 
-The resulting directory consists of "_primary_" and "_secondary_" folders with individual results per snapshot. 
-For example: when analyzing an image of cells, after segmentation the directory will contain the following folders
-- ***Primary***: Contains the area and roundness of __cells__ (where, cell = nuclei and cytoplasm) as *.png* masks and two *.csv* files.
+## License
 
-  - *file_name_**Center.csv*** = A csv file containing the center coordinates of the cell in [*X,Y*] format.
-  
-  - *file_name_**size_roundness.csv*** = A csv file containing the area of the cell and its roundness in [*area,roundness*] format.
+This project is protected under the BSD 3-Clause "New" or "Revised" License. For more details, refer to the [LICENSE](https://github.com/ITMO-MMRM-lab/cellpose_plus/tree/main/LICENSE) file.
 
-- ***Secondary*** -> contains the area and roundness of the __nuclei__ as *.png* masks and a *.csv* file.
+---
 
-  - *file_name_**size_roundness.csv*** = A csv file containing the area of the nuclei and roundness in [*area,roundness*] format.
+## Citation
 
-In instances where ratio and Voronoi entropy are selected. The results of the metrics are saved in the parent directory as the image. 
+If you use this software, please cite it as below.
 
-- ***Continous symmetry measure (CSM)***: The symmetry of cell is stored in *file_name_**CSM_values.csv*** format as [*cell id, CSM_metric_value*].
+### APA format:
 
-- ***Ratio***: The ratio of cell to nuclei is stored in *file_name_**ratio.csv*** format as [*cell id, nuclei id, ratio*].
+    ITMO-MMRM-lab (2023). cellpose_plus repository [Computer software]. https://github.com/ITMO-MMRM-lab/cellpose_plus
 
-- ***Voronoi entropy***: The vornoir entropy of the entire image is stored as a single value in *file_name_**vornoi_entropy.csv*** and its respective image as ***voronoi.png***
+### BibTeX format:
 
+    @misc{cellpose_plus,
 
-For features provided by the basic Cellpose, such as image restoration, segmentation settings and mask editing, we encourage you to refer to the original [Cellpose documentation](https://cellpose.readthedocs.io/en/latest/index.html).
+        author = {ITMO-MMRM-lab},
 
-### Citation
+        title = {cellpose_plus repository},
 
-If you find our project helpful, use the following bibtex to reference our [paper](https://arxiv.org/abs/2410.18738).
+        year = {2023},
 
-~~~
-@article{huaman2024cellpose+,
-  title={Cellpose+, a morphological analysis tool for feature extraction of stained cell images},
-  author={Huaman, Israel A and Ghorabe, Fares DE and Chumakova, Sofya S and Pisarenko, Alexandra A and Dudaev, Alexey E and Volova, Tatiana G and Ryltseva, Galina A and Ulasevich, Sviatlana A and Shishatskaya, Ekaterina I and Skorb, Ekaterina V and others},
-  journal={arXiv preprint arXiv:2410.18738},
-  year={2024}
-}
-~~~
+        publisher = {github.com},
 
-As we work over Cellpose, we ask you to also cite the Cellpose [paper](https://t.co/kBMXmPp3Yn?amp=1).
+        journal = {github.com repository},
+
+        howpublished = {\url{https://github.com/ITMO-MMRM-lab/cellpose_plus.git}},
+
+        url = {https://github.com/ITMO-MMRM-lab/cellpose_plus.git}
+
+    }
+
+---

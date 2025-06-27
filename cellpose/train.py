@@ -29,17 +29,25 @@ def _loss_fn_seg(lbl, y, device):
     """
     criterion = nn.MSELoss(reduction="mean")
     criterion2 = nn.BCEWithLogitsLoss(reduction="mean")
-    veci = 5. * torch.from_numpy(lbl[:, 1:]).to(device)
+    veci = 5.0 * torch.from_numpy(lbl[:, 1:]).to(device)
     loss = criterion(y[:, :2], veci)
-    loss /= 2.
+    loss /= 2.0
     loss2 = criterion2(y[:, -1], torch.from_numpy(lbl[:, 0] > 0.5).to(device).float())
     loss = loss + loss2
     return loss
 
 
-def _get_batch(inds, data=None, labels=None, files=None, labels_files=None,
-               channels=None, channel_axis=None, rgb=False,
-               normalize_params={"normalize": False}):
+def _get_batch(
+    inds,
+    data=None,
+    labels=None,
+    files=None,
+    labels_files=None,
+    channels=None,
+    channel_axis=None,
+    rgb=False,
+    normalize_params={"normalize": False},
+):
     """
     Get a batch of images and labels.
 
@@ -59,8 +67,13 @@ def _get_batch(inds, data=None, labels=None, files=None, labels_files=None,
     if data is None:
         lbls = None
         imgs = [io.imread(files[i]) for i in inds]
-        imgs = _reshape_norm(imgs, channels=channels, channel_axis=channel_axis,
-                             rgb=rgb, normalize_params=normalize_params)
+        imgs = _reshape_norm(
+            imgs,
+            channels=channels,
+            channel_axis=channel_axis,
+            rgb=rgb,
+            normalize_params=normalize_params,
+        )
         if labels_files is not None:
             lbls = [io.imread(labels_files[i])[1:] for i in inds]
     else:
@@ -70,6 +83,23 @@ def _get_batch(inds, data=None, labels=None, files=None, labels_files=None,
 
 
 def pad_to_rgb(img):
+    """
+    Pad a grayscale or non-RGB image to ensure it has three color channels.
+
+        This method modifies the input image so that it has three channels.
+        If the image is grayscale (2D) or has less than three channels, it
+        is padded accordingly. For images with two dimensions, the method
+        adds two additional channels by duplicating the grayscale information.
+        For images with fewer than three channels, one channel is randomly
+        flipped, and a blank channel is inserted to achieve three channels.
+
+        Args:
+            img: The input image, which can be grayscale or have less than
+            three channels.
+
+        Returns:
+            A 3-dimensional image array with three channels.
+    """
     if img.ndim == 2 or np.ptp(img[1]) < 1e-3:
         if img.ndim == 2:
             img = img[np.newaxis, :, :]
@@ -86,6 +116,21 @@ def pad_to_rgb(img):
 
 
 def convert_to_rgb(img):
+    """
+    Convert an image to RGB format.
+
+        This method takes a grayscale or single-channel image and converts it into RGB format.
+        If the input image is 2-dimensional (grayscale), it expands the dimensions and duplicates
+        the same values across three channels. If the input image has fewer than three channels,
+        it averages the channels, normalizes the resulting image, and then duplicates it across
+        three channels.
+
+        Args:
+            img: The input image to be converted, which can be either a 2D or 3D numpy array.
+
+        Returns:
+            A 3D numpy array representing the image in RGB format.
+    """
     if img.ndim == 2:
         img = img[np.newaxis, :, :]
         img = np.tile(img, (3, 1, 1))
@@ -96,8 +141,13 @@ def convert_to_rgb(img):
     return img
 
 
-def _reshape_norm(data, channels=None, channel_axis=None, rgb=False,
-                  normalize_params={"normalize": False}):
+def _reshape_norm(
+    data,
+    channels=None,
+    channel_axis=None,
+    rgb=False,
+    normalize_params={"normalize": False},
+):
     """
     Reshapes and normalizes the input data.
 
@@ -126,15 +176,17 @@ def _reshape_norm(data, channels=None, channel_axis=None, rgb=False,
     return data
 
 
-def _reshape_norm_save(files, channels=None, channel_axis=None,
-                       normalize_params={"normalize": False}):
-    """ not currently used -- normalization happening on each batch if not load_files """
+def _reshape_norm_save(
+    files, channels=None, channel_axis=None, normalize_params={"normalize": False}
+):
+    """not currently used -- normalization happening on each batch if not load_files"""
     files_new = []
     for f in trange(files):
         td = io.imread(f)
         if channels is not None:
-            td = transforms.convert_image(td, channels=channels,
-                                          channel_axis=channel_axis)
+            td = transforms.convert_image(
+                td, channels=channels, channel_axis=channel_axis
+            )
             td = td.transpose(2, 0, 1)
         if normalize_params["normalize"]:
             td = transforms.normalize_img(td, normalize=normalize_params, axis=0)
@@ -150,13 +202,26 @@ def _reshape_norm_save(files, channels=None, channel_axis=None,
     #                     channel_axis=channel_axis, normalize_params=normalize_params)
 
 
-def _process_train_test(train_data=None, train_labels=None, train_files=None,
-                        train_labels_files=None, train_probs=None, test_data=None,
-                        test_labels=None, test_files=None, test_labels_files=None,
-                        test_probs=None, load_files=True, min_train_masks=5,
-                        compute_flows=False, channels=None, channel_axis=None,
-                        rgb=False, normalize_params={"normalize": False
-                                                    }, device=None):
+def _process_train_test(
+    train_data=None,
+    train_labels=None,
+    train_files=None,
+    train_labels_files=None,
+    train_probs=None,
+    test_data=None,
+    test_labels=None,
+    test_files=None,
+    test_labels_files=None,
+    test_probs=None,
+    load_files=True,
+    min_train_masks=5,
+    compute_flows=False,
+    channels=None,
+    channel_axis=None,
+    rgb=False,
+    normalize_params={"normalize": False},
+    device=None,
+):
     """
     Process train and test data.
 
@@ -184,8 +249,12 @@ def _process_train_test(train_data=None, train_labels=None, train_files=None,
         tuple: A tuple containing the processed train and test data and sampling probabilities and diameters.
     """
     if device == None:
-        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('mps') if torch.backends.mps.is_available() else None
-    
+        device = (
+            torch.device("cuda")
+            if torch.cuda.is_available()
+            else torch.device("mps") if torch.backends.mps.is_available() else None
+        )
+
     if train_data is not None and train_labels is not None:
         # if data is loaded
         nimg = len(train_data)
@@ -198,8 +267,9 @@ def _process_train_test(train_data=None, train_labels=None, train_files=None,
                 os.path.splitext(str(tf))[0] + "_flows.tif" for tf in train_files
             ]
             train_labels_files = [tf for tf in train_labels_files if os.path.exists(tf)]
-        if (test_data is not None or
-                test_files is not None) and test_labels_files is None:
+        if (
+            test_data is not None or test_files is not None
+        ) and test_labels_files is None:
             test_labels_files = [
                 os.path.splitext(str(tf))[0] + "_flows.tif" for tf in test_files
             ]
@@ -217,13 +287,15 @@ def _process_train_test(train_data=None, train_labels=None, train_files=None,
             test_labels = [io.imread(test_labels_files[i]) for i in trange(nimg_test)]
 
     ### check that arrays are correct size
-    if ((train_labels is not None and nimg != len(train_labels)) or
-        (train_labels_files is not None and nimg != len(train_labels_files))):
+    if (train_labels is not None and nimg != len(train_labels)) or (
+        train_labels_files is not None and nimg != len(train_labels_files)
+    ):
         error_message = "train data and labels not same length"
         train_logger.critical(error_message)
         raise ValueError(error_message)
-    if ((test_labels is not None and nimg_test != len(test_labels)) or
-        (test_labels_files is not None and nimg_test != len(test_labels_files))):
+    if (test_labels is not None and nimg_test != len(test_labels)) or (
+        test_labels_files is not None and nimg_test != len(test_labels_files)
+    ):
         train_logger.warning("test data and labels not same length, not using")
         test_data, test_files = None, None
     if train_labels is not None:
@@ -238,40 +310,50 @@ def _process_train_test(train_data=None, train_labels=None, train_files=None,
 
     ### check that flows are computed
     if train_labels is not None:
-        train_labels = dynamics.labels_to_flows(train_labels, files=train_files,
-                                                device=device)
+        train_labels = dynamics.labels_to_flows(
+            train_labels, files=train_files, device=device
+        )
         if test_labels is not None:
-            test_labels = dynamics.labels_to_flows(test_labels, files=test_files,
-                                                   device=device)
+            test_labels = dynamics.labels_to_flows(
+                test_labels, files=test_files, device=device
+            )
     elif compute_flows:
         for k in trange(nimg):
-            tl = dynamics.labels_to_flows(io.imread(train_labels_files),
-                                          files=train_files, device=device)
+            tl = dynamics.labels_to_flows(
+                io.imread(train_labels_files), files=train_files, device=device
+            )
         if test_files is not None:
             for k in trange(nimg_test):
-                tl = dynamics.labels_to_flows(io.imread(test_labels_files),
-                                              files=test_files, device=device)
+                tl = dynamics.labels_to_flows(
+                    io.imread(test_labels_files), files=test_files, device=device
+                )
 
     ### compute diameters
     nmasks = np.zeros(nimg)
     diam_train = np.zeros(nimg)
     train_logger.info(">>> computing diameters")
     for k in trange(nimg):
-        tl = (train_labels[k][0]
-              if train_labels is not None else io.imread(train_labels_files[k])[0])
+        tl = (
+            train_labels[k][0]
+            if train_labels is not None
+            else io.imread(train_labels_files[k])[0]
+        )
         diam_train[k], dall = utils.diameters(tl)
         nmasks[k] = len(dall)
-    diam_train[diam_train < 5] = 5.
+    diam_train[diam_train < 5] = 5.0
     if test_data is not None:
         diam_test = np.array(
-            [utils.diameters(test_labels[k][0])[0] for k in trange(len(test_labels))])
-        diam_test[diam_test < 5] = 5.
+            [utils.diameters(test_labels[k][0])[0] for k in trange(len(test_labels))]
+        )
+        diam_test[diam_test < 5] = 5.0
     elif test_labels_files is not None:
-        diam_test = np.array([
-            utils.diameters(io.imread(test_labels_files[k])[0])[0]
-            for k in trange(len(test_labels_files))
-        ])
-        diam_test[diam_test < 5] = 5.
+        diam_test = np.array(
+            [
+                utils.diameters(io.imread(test_labels_files[k])[0])[0]
+                for k in trange(len(test_labels_files))
+            ]
+        )
+        diam_test[diam_test < 5] = 5.0
     else:
         diam_test = None
 
@@ -296,12 +378,16 @@ def _process_train_test(train_data=None, train_labels=None, train_files=None,
             nimg = len(train_data)
 
     ### normalize probabilities
-    train_probs = 1. / nimg * np.ones(nimg,
-                                      "float64") if train_probs is None else train_probs
+    train_probs = (
+        1.0 / nimg * np.ones(nimg, "float64") if train_probs is None else train_probs
+    )
     train_probs /= train_probs.sum()
     if test_files is not None or test_data is not None:
-        test_probs = 1. / nimg_test * np.ones(
-            nimg_test, "float64") if test_probs is None else test_probs
+        test_probs = (
+            1.0 / nimg_test * np.ones(nimg_test, "float64")
+            if test_probs is None
+            else test_probs
+        )
         test_probs /= test_probs.sum()
 
     ### reshape and normalize train / test data
@@ -312,29 +398,75 @@ def _process_train_test(train_data=None, train_labels=None, train_files=None,
         if normalize_params["normalize"]:
             train_logger.info(f">>> normalizing {normalize_params}")
         if train_data is not None:
-            train_data = _reshape_norm(train_data, channels=channels,
-                                       channel_axis=channel_axis, rgb=rgb,
-                                       normalize_params=normalize_params)
+            train_data = _reshape_norm(
+                train_data,
+                channels=channels,
+                channel_axis=channel_axis,
+                rgb=rgb,
+                normalize_params=normalize_params,
+            )
             normed = True
         if test_data is not None:
-            test_data = _reshape_norm(test_data, channels=channels,
-                                      channel_axis=channel_axis, rgb=rgb,
-                                      normalize_params=normalize_params)
+            test_data = _reshape_norm(
+                test_data,
+                channels=channels,
+                channel_axis=channel_axis,
+                rgb=rgb,
+                normalize_params=normalize_params,
+            )
 
-    return (train_data, train_labels, train_files, train_labels_files, train_probs,
-            diam_train, test_data, test_labels, test_files, test_labels_files,
-            test_probs, diam_test, normed)
+    return (
+        train_data,
+        train_labels,
+        train_files,
+        train_labels_files,
+        train_probs,
+        diam_train,
+        test_data,
+        test_labels,
+        test_files,
+        test_labels_files,
+        test_probs,
+        diam_test,
+        normed,
+    )
 
 
-def train_seg(net, train_data=None, train_labels=None, train_files=None,
-              train_labels_files=None, train_probs=None, test_data=None,
-              test_labels=None, test_files=None, test_labels_files=None,
-              test_probs=None, load_files=True, batch_size=8, learning_rate=0.005,
-              n_epochs=2000, weight_decay=1e-5, momentum=0.9, SGD=False, channels=None,
-              channel_axis=None, rgb=False, normalize=True, compute_flows=False,
-              save_path=None, save_every=100, save_each=False, nimg_per_epoch=None,
-              nimg_test_per_epoch=None, rescale=True, scale_range=None, bsize=224,
-              min_train_masks=5, model_name=None):
+def train_seg(
+    net,
+    train_data=None,
+    train_labels=None,
+    train_files=None,
+    train_labels_files=None,
+    train_probs=None,
+    test_data=None,
+    test_labels=None,
+    test_files=None,
+    test_labels_files=None,
+    test_probs=None,
+    load_files=True,
+    batch_size=8,
+    learning_rate=0.005,
+    n_epochs=2000,
+    weight_decay=1e-5,
+    momentum=0.9,
+    SGD=False,
+    channels=None,
+    channel_axis=None,
+    rgb=False,
+    normalize=True,
+    compute_flows=False,
+    save_path=None,
+    save_every=100,
+    save_each=False,
+    nimg_per_epoch=None,
+    nimg_test_per_epoch=None,
+    rescale=True,
+    scale_range=None,
+    bsize=224,
+    min_train_masks=5,
+    model_name=None,
+):
     """
     Train the network with images for segmentation.
 
@@ -372,7 +504,7 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
 
     Returns:
         tuple: A tuple containing the path to the saved model weights, training losses, and test losses.
-       
+
     """
     device = net.device
 
@@ -387,19 +519,41 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         normalize_params = models.normalize_default
         normalize_params["normalize"] = normalize
 
-    out = _process_train_test(train_data=train_data, train_labels=train_labels,
-                              train_files=train_files, train_labels_files=train_labels_files,
-                              train_probs=train_probs,
-                              test_data=test_data, test_labels=test_labels,
-                              test_files=test_files, test_labels_files=test_labels_files,
-                              test_probs=test_probs,
-                              load_files=load_files, min_train_masks=min_train_masks,
-                              compute_flows=compute_flows, channels=channels,
-                              channel_axis=channel_axis, rgb=rgb,
-                              normalize_params=normalize_params, device=net.device)
-    (train_data, train_labels, train_files, train_labels_files, train_probs, diam_train,
-     test_data, test_labels, test_files, test_labels_files, test_probs, diam_test,
-     normed) = out
+    out = _process_train_test(
+        train_data=train_data,
+        train_labels=train_labels,
+        train_files=train_files,
+        train_labels_files=train_labels_files,
+        train_probs=train_probs,
+        test_data=test_data,
+        test_labels=test_labels,
+        test_files=test_files,
+        test_labels_files=test_labels_files,
+        test_probs=test_probs,
+        load_files=load_files,
+        min_train_masks=min_train_masks,
+        compute_flows=compute_flows,
+        channels=channels,
+        channel_axis=channel_axis,
+        rgb=rgb,
+        normalize_params=normalize_params,
+        device=net.device,
+    )
+    (
+        train_data,
+        train_labels,
+        train_files,
+        train_labels_files,
+        train_probs,
+        diam_train,
+        test_data,
+        test_labels,
+        test_files,
+        test_labels_files,
+        test_probs,
+        diam_test,
+        normed,
+    ) = out
     # already normalized, do not normalize during training
     if normed:
         kwargs = {}
@@ -408,16 +562,18 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
             "normalize_params": normalize_params,
             "channels": channels,
             "channel_axis": channel_axis,
-            "rgb": rgb
+            "rgb": rgb,
         }
-    
+
     net.diam_labels.data = torch.Tensor([diam_train.mean()]).to(device)
 
     nimg = len(train_data) if train_data is not None else len(train_files)
     nimg_test = len(test_data) if test_data is not None else None
     nimg_test = len(test_files) if test_files is not None else nimg_test
     nimg_per_epoch = nimg if nimg_per_epoch is None else nimg_per_epoch
-    nimg_test_per_epoch = nimg_test if nimg_test_per_epoch is None else nimg_test_per_epoch
+    nimg_test_per_epoch = (
+        nimg_test if nimg_test_per_epoch is None else nimg_test_per_epoch
+    )
 
     # learning rate schedule
     LR = np.linspace(0, learning_rate, 10)
@@ -437,14 +593,19 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         train_logger.info(
             f">>> AdamW, learning_rate={learning_rate:0.5f}, weight_decay={weight_decay:0.5f}"
         )
-        optimizer = torch.optim.AdamW(net.parameters(), lr=learning_rate,
-                                      weight_decay=weight_decay)
+        optimizer = torch.optim.AdamW(
+            net.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
     else:
         train_logger.info(
             f">>> SGD, learning_rate={learning_rate:0.5f}, weight_decay={weight_decay:0.5f}, momentum={momentum:0.3f}"
         )
-        optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate,
-                                    weight_decay=weight_decay, momentum=momentum)
+        optimizer = torch.optim.SGD(
+            net.parameters(),
+            lr=learning_rate,
+            weight_decay=weight_decay,
+            momentum=momentum,
+        )
 
     t0 = time.time()
     model_name = f"cellpose_{t0}" if model_name is None else model_name
@@ -460,27 +621,36 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         np.random.seed(iepoch)
         if nimg != nimg_per_epoch:
             # choose random images for epoch with probability train_probs
-            rperm = np.random.choice(np.arange(0, nimg), size=(nimg_per_epoch,),
-                                     p=train_probs)
+            rperm = np.random.choice(
+                np.arange(0, nimg), size=(nimg_per_epoch,), p=train_probs
+            )
         else:
             # otherwise use all images
             rperm = np.random.permutation(np.arange(0, nimg))
         for param_group in optimizer.param_groups:
-            param_group["lr"] = LR[iepoch] # set learning rate
+            param_group["lr"] = LR[iepoch]  # set learning rate
         net.train()
         for k in range(0, nimg_per_epoch, batch_size):
             kend = min(k + batch_size, nimg_per_epoch)
             inds = rperm[k:kend]
-            imgs, lbls = _get_batch(inds, data=train_data, labels=train_labels,
-                                    files=train_files, labels_files=train_labels_files,
-                                    **kwargs)
+            imgs, lbls = _get_batch(
+                inds,
+                data=train_data,
+                labels=train_labels,
+                files=train_files,
+                labels_files=train_labels_files,
+                **kwargs,
+            )
             diams = np.array([diam_train[i] for i in inds])
-            rsc = diams / net.diam_mean.item() if rescale else np.ones(
-                len(diams), "float32")
+            rsc = (
+                diams / net.diam_mean.item()
+                if rescale
+                else np.ones(len(diams), "float32")
+            )
             # augmentations
-            imgi, lbl = transforms.random_rotate_and_resize(imgs, Y=lbls, rescale=rsc,
-                                                            scale_range=scale_range,
-                                                            xy=(bsize, bsize))[:2]
+            imgi, lbl = transforms.random_rotate_and_resize(
+                imgs, Y=lbls, rescale=rsc, scale_range=scale_range, xy=(bsize, bsize)
+            )[:2]
             # network and loss optimization
             X = torch.from_numpy(imgi).to(device)
             y = net(X)[0]
@@ -499,28 +669,42 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
         train_losses[iepoch] /= nimg_per_epoch
 
         if iepoch == 5 or iepoch % 10 == 0:
-            lavgt = 0.
+            lavgt = 0.0
             if test_data is not None or test_files is not None:
                 np.random.seed(42)
                 if nimg_test != nimg_test_per_epoch:
-                    rperm = np.random.choice(np.arange(0, nimg_test),
-                                             size=(nimg_test_per_epoch,), p=test_probs)
+                    rperm = np.random.choice(
+                        np.arange(0, nimg_test),
+                        size=(nimg_test_per_epoch,),
+                        p=test_probs,
+                    )
                 else:
                     rperm = np.random.permutation(np.arange(0, nimg_test))
                 for ibatch in range(0, len(rperm), batch_size):
                     with torch.no_grad():
                         net.eval()
-                        inds = rperm[ibatch:ibatch + batch_size]
-                        imgs, lbls = _get_batch(inds, data=test_data,
-                                                labels=test_labels, files=test_files,
-                                                labels_files=test_labels_files,
-                                                **kwargs)
+                        inds = rperm[ibatch : ibatch + batch_size]
+                        imgs, lbls = _get_batch(
+                            inds,
+                            data=test_data,
+                            labels=test_labels,
+                            files=test_files,
+                            labels_files=test_labels_files,
+                            **kwargs,
+                        )
                         diams = np.array([diam_test[i] for i in inds])
-                        rsc = diams / net.diam_mean.item() if rescale else np.ones(
-                            len(diams), "float32")
+                        rsc = (
+                            diams / net.diam_mean.item()
+                            if rescale
+                            else np.ones(len(diams), "float32")
+                        )
                         imgi, lbl = transforms.random_rotate_and_resize(
-                            imgs, Y=lbls, rescale=rsc, scale_range=scale_range,
-                            xy=(bsize, bsize))[:2]
+                            imgs,
+                            Y=lbls,
+                            rescale=rsc,
+                            scale_range=scale_range,
+                            xy=(bsize, bsize),
+                        )[:2]
                         X = torch.from_numpy(imgi).to(device)
                         y = net(X)[0]
                         loss = _loss_fn_seg(lbl, y, device)
@@ -536,26 +720,47 @@ def train_seg(net, train_data=None, train_labels=None, train_files=None,
             lavg, nsum = 0, 0
 
         if iepoch == n_epochs - 1 or (iepoch % save_every == 0 and iepoch != 0):
-            if save_each and iepoch != n_epochs - 1:  #separate files as model progresses
+            if (
+                save_each and iepoch != n_epochs - 1
+            ):  # separate files as model progresses
                 filename0 = str(filename) + f"_epoch_{iepoch:04d}"
             else:
                 filename0 = filename
             train_logger.info(f"saving network parameters to {filename0}")
             net.save_model(filename0)
-    
+
     net.save_model(filename)
 
     return filename, train_losses, test_losses
 
 
-def train_size(net, pretrained_model, train_data=None, train_labels=None,
-               train_files=None, train_labels_files=None, train_probs=None,
-               test_data=None, test_labels=None, test_files=None,
-               test_labels_files=None, test_probs=None, load_files=True,
-               min_train_masks=5, channels=None, channel_axis=None, rgb=False,
-               normalize=True, nimg_per_epoch=None, nimg_test_per_epoch=None,
-               batch_size=64, scale_range=1.0, bsize=512, l2_regularization=1.0,
-               n_epochs=10):
+def train_size(
+    net,
+    pretrained_model,
+    train_data=None,
+    train_labels=None,
+    train_files=None,
+    train_labels_files=None,
+    train_probs=None,
+    test_data=None,
+    test_labels=None,
+    test_files=None,
+    test_labels_files=None,
+    test_probs=None,
+    load_files=True,
+    min_train_masks=5,
+    channels=None,
+    channel_axis=None,
+    rgb=False,
+    normalize=True,
+    nimg_per_epoch=None,
+    nimg_test_per_epoch=None,
+    batch_size=64,
+    scale_range=1.0,
+    bsize=512,
+    l2_regularization=1.0,
+    n_epochs=10,
+):
     """Train the size model.
 
     Args:
@@ -594,16 +799,39 @@ def train_size(net, pretrained_model, train_data=None, train_labels=None,
         normalize_params["normalize"] = normalize
 
     out = _process_train_test(
-        train_data=train_data, train_labels=train_labels, train_files=train_files,
-        train_labels_files=train_labels_files, train_probs=train_probs,
-        test_data=test_data, test_labels=test_labels, test_files=test_files,
-        test_labels_files=test_labels_files, test_probs=test_probs,
-        load_files=load_files, min_train_masks=min_train_masks, compute_flows=False,
-        channels=channels, channel_axis=channel_axis, normalize_params=normalize_params,
-        device=net.device)
-    (train_data, train_labels, train_files, train_labels_files, train_probs, diam_train,
-     test_data, test_labels, test_files, test_labels_files, test_probs, diam_test,
-     normed) = out
+        train_data=train_data,
+        train_labels=train_labels,
+        train_files=train_files,
+        train_labels_files=train_labels_files,
+        train_probs=train_probs,
+        test_data=test_data,
+        test_labels=test_labels,
+        test_files=test_files,
+        test_labels_files=test_labels_files,
+        test_probs=test_probs,
+        load_files=load_files,
+        min_train_masks=min_train_masks,
+        compute_flows=False,
+        channels=channels,
+        channel_axis=channel_axis,
+        normalize_params=normalize_params,
+        device=net.device,
+    )
+    (
+        train_data,
+        train_labels,
+        train_files,
+        train_labels_files,
+        train_probs,
+        diam_train,
+        test_data,
+        test_labels,
+        test_files,
+        test_labels_files,
+        test_probs,
+        diam_test,
+        normed,
+    ) = out
 
     # already normalized, do not normalize during training
     if normed:
@@ -613,14 +841,16 @@ def train_size(net, pretrained_model, train_data=None, train_labels=None,
             "normalize_params": normalize_params,
             "channels": channels,
             "channel_axis": channel_axis,
-            "rgb": rgb
+            "rgb": rgb,
         }
 
     nimg = len(train_data) if train_data is not None else len(train_files)
     nimg_test = len(test_data) if test_data is not None else None
     nimg_test = len(test_files) if test_files is not None else nimg_test
     nimg_per_epoch = nimg if nimg_per_epoch is None else nimg_per_epoch
-    nimg_test_per_epoch = nimg_test if nimg_test_per_epoch is None else nimg_test_per_epoch
+    nimg_test_per_epoch = (
+        nimg_test if nimg_test_per_epoch is None else nimg_test_per_epoch
+    )
 
     diam_mean = net.diam_mean.item()
     device = net.device
@@ -632,18 +862,21 @@ def train_size(net, pretrained_model, train_data=None, train_labels=None,
     for iepoch in range(n_epochs):
         np.random.seed(iepoch)
         if nimg != nimg_per_epoch:
-            rperm = np.random.choice(np.arange(0, nimg), size=(nimg_per_epoch,),
-                                     p=train_probs)
+            rperm = np.random.choice(
+                np.arange(0, nimg), size=(nimg_per_epoch,), p=train_probs
+            )
         else:
             rperm = np.random.permutation(np.arange(0, nimg))
         for ibatch in range(0, nimg_per_epoch, batch_size):
             inds_batch = np.arange(ibatch, min(nimg_per_epoch, ibatch + batch_size))
             inds = rperm[inds_batch]
-            imgs, lbls = _get_batch(inds, data=train_data, labels=train_labels,
-                                    files=train_files, **kwargs)
+            imgs, lbls = _get_batch(
+                inds, data=train_data, labels=train_labels, files=train_files, **kwargs
+            )
             diami = diam_train[inds].copy()
             imgi, lbl, scale = transforms.random_rotate_and_resize(
-                imgs, scale_range=scale_range, xy=(bsize, bsize))
+                imgs, scale_range=scale_range, xy=(bsize, bsize)
+            )
             imgi = torch.from_numpy(imgi).to(device)
             with torch.no_grad():
                 feat = net(imgi)[1]
@@ -651,10 +884,11 @@ def train_size(net, pretrained_model, train_data=None, train_labels=None,
             styles[indsi] = feat.cpu().numpy()
             diams[indsi] = np.log(diami) - np.log(diam_mean) + np.log(scale)
         del feat
-        train_logger.info("ran %d epochs in %0.3f sec" %
-                          (iepoch + 1, time.time() - tic))
+        train_logger.info(
+            "ran %d epochs in %0.3f sec" % (iepoch + 1, time.time() - tic)
+        )
 
-    l2_regularization = 1.
+    l2_regularization = 1.0
 
     # create model
     smean = styles.copy().mean(axis=0)
@@ -673,23 +907,31 @@ def train_size(net, pretrained_model, train_data=None, train_labels=None,
         diams_test = np.zeros((nimg_test_per_epoch,), np.float32)
         diams_test0 = np.zeros((nimg_test_per_epoch,), np.float32)
         if nimg_test != nimg_test_per_epoch:
-            rperm = np.random.choice(np.arange(0, nimg_test),
-                                     size=(nimg_test_per_epoch,), p=test_probs)
+            rperm = np.random.choice(
+                np.arange(0, nimg_test), size=(nimg_test_per_epoch,), p=test_probs
+            )
         else:
             rperm = np.random.permutation(np.arange(0, nimg_test))
         for ibatch in range(0, nimg_test_per_epoch, batch_size):
-            inds_batch = np.arange(ibatch, min(nimg_test_per_epoch,
-                                               ibatch + batch_size))
+            inds_batch = np.arange(
+                ibatch, min(nimg_test_per_epoch, ibatch + batch_size)
+            )
             inds = rperm[inds_batch]
-            imgs, lbls = _get_batch(inds, data=test_data, labels=test_labels,
-                                    files=test_files, labels_files=test_labels_files,
-                                    **kwargs)
+            imgs, lbls = _get_batch(
+                inds,
+                data=test_data,
+                labels=test_labels,
+                files=test_files,
+                labels_files=test_labels_files,
+                **kwargs,
+            )
             diami = diam_test[inds].copy()
             imgi, lbl, scale = transforms.random_rotate_and_resize(
-                imgs, Y=lbls, scale_range=scale_range, xy=(bsize, bsize))
+                imgs, Y=lbls, scale_range=scale_range, xy=(bsize, bsize)
+            )
             imgi = torch.from_numpy(imgi).to(device)
             diamt = np.array([utils.diameters(lbl0[0])[0] for lbl0 in lbl])
-            diamt = np.maximum(5., diamt)
+            diamt = np.maximum(5.0, diamt)
             with torch.no_grad():
                 feat = net(imgi)[1]
             styles_test[inds_batch] = feat.cpu().numpy()
@@ -697,9 +939,10 @@ def train_size(net, pretrained_model, train_data=None, train_labels=None,
             diams_test0[inds_batch] = diamt
 
         diam_test_pred = np.exp(A @ (styles_test - smean).T + np.log(diam_mean) + ymean)
-        diam_test_pred = np.maximum(5., diam_test_pred)
-        train_logger.info("test correlation: %0.4f" %
-                          np.corrcoef(diams_test0, diam_test_pred)[0, 1])
+        diam_test_pred = np.maximum(5.0, diam_test_pred)
+        train_logger.info(
+            "test correlation: %0.4f" % np.corrcoef(diams_test0, diam_test_pred)[0, 1]
+        )
 
     pretrained_size = str(pretrained_model) + "_size.npy"
     params = {"A": A, "smean": smean, "diam_mean": diam_mean, "ymean": ymean}

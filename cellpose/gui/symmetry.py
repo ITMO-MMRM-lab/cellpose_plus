@@ -4,6 +4,7 @@ import pandas as pd
 
 # Definig the rotating function
 
+
 def rotate(origin, point, angle):
     """
     Rotate a point counterclockwise by a given angle around a given origin.
@@ -20,108 +21,134 @@ def rotate(origin, point, angle):
     return qx, qy
 
 
-def centroid_calc(polygon,n):
+def centroid_calc(polygon, n):
+    """
+    Calculate centroid of a given polygon.
+    N-polygon should be given as an array of tuples (coordinates of n-polygon vertices): [(x1,y1),(x2,y2)...(xn,yn)].
+    N (number of vertices) should be given as integer.
+    """
 
-  """
-  Calculate centroid of a given polygon.
-  N-polygon should be given as an array of tuples (coordinates of n-polygon vertices): [(x1,y1),(x2,y2)...(xn,yn)].
-  N (number of vertices) should be given as integer.
-  """
+    xcentroid, ycentroid = 0, 0
 
-  xcentroid,ycentroid = 0,0
+    for point in polygon:
+        xcentroid += point[0]
+        ycentroid += point[1]
 
-  for point in polygon:
-    xcentroid += point[0]
-    ycentroid += point[1]
+    xcentroid = xcentroid / n
+    ycentroid = ycentroid / n
+    centroid = xcentroid, ycentroid
 
-  xcentroid = xcentroid/n
-  ycentroid = ycentroid/n
-  centroid = xcentroid, ycentroid
+    return centroid
 
-  return centroid
 
-def area_of_symm_polygon(polygon,centroid,n):
+def area_of_symm_polygon(polygon, centroid, n):
+    """
+    Calculate area of given n-polygon. Can only be used for symmetrical polygons.
+    N-polygon should be given as an array of tuples (coordinates of n-polygon vertices): [(x1,y1),(x2,y2)...(xn,yn)].
+    Centroid should be given as a tuple of coordinates: (x,y).
+    N (number of vertices) should be given as integer.
+    """
 
-  """
-  Calculate area of given n-polygon. Can only be used for symmetrical polygons.
-  N-polygon should be given as an array of tuples (coordinates of n-polygon vertices): [(x1,y1),(x2,y2)...(xn,yn)].
-  Centroid should be given as a tuple of coordinates: (x,y).
-  N (number of vertices) should be given as integer.
-  """
+    # Calculating R (circumscribed circle radius)
+    R = math.sqrt(
+        (polygon[0][0] - centroid[0]) ** 2 + (polygon[0][1] - centroid[1]) ** 2
+    )  # distance between first polygon point and its centroid
 
-  # Calculating R (circumscribed circle radius)
-  R = math.sqrt((polygon[0][0]-centroid[0])**2 + (polygon[0][1]-centroid[1])**2) # distance between first polygon point and its centroid
+    # Calculating the area of polygon by formula: Sn = (1/2)*(R^2)*n*sin(360/n)
+    S = (1 / 2) * R**2 * n * math.sin(math.pi * 2 / n)
 
-  # Calculating the area of polygon by formula: Sn = (1/2)*(R^2)*n*sin(360/n)
-  S = (1/2)*R**2*n*math.sin(math.pi*2/n)
+    return S
 
-  return S
 
 def check_clockwise(polygon):
+    """
+    Determine if a polygon's vertices are ordered in a clockwise direction.
+
+        This method checks the order of the vertices of the given polygon
+        and returns a value indicating whether the vertices are arranged
+        in a clockwise manner.
+
+        Args:
+            polygon: A list of tuples representing the vertices of the polygon,
+                where each tuple contains the x and y coordinates of a vertex.
+
+        Returns:
+            An integer representing the ordering of the polygon's vertices:
+            -1 if the vertices are ordered counter-clockwise,
+             1 if they are ordered clockwise.
+    """
     clockwise = -1
-    if (sum(x0*y1 - x1*y0 for ((x0, y0), (x1, y1)) in zip(polygon, polygon[1:] + [polygon[0]]))) < 0:
+    if (
+        sum(
+            x0 * y1 - x1 * y0
+            for ((x0, y0), (x1, y1)) in zip(polygon, polygon[1:] + [polygon[0]])
+        )
+    ) < 0:
         clockwise = 1
     return clockwise
 
+
 def CSM_calc(polygon):
+    """
+    Calculate CSM of given n-polygon.
+    N-polygon should be given as an array of tuples (coordinates of n-polygon vertices): [(x1,y1),(x2,y2)...(xn,yn)].
+    """
 
-  """
-  Calculate CSM of given n-polygon.
-  N-polygon should be given as an array of tuples (coordinates of n-polygon vertices): [(x1,y1),(x2,y2)...(xn,yn)].
-  """
+    n = len(polygon)  # number of vertices
 
-  n = len(polygon)  # number of vertices
+    # Calculating centroid for n-polygon
+    origin = centroid_calc(polygon, n)
 
-  # Calculating centroid for n-polygon
-  origin = centroid_calc(polygon,n)
+    # Checking if the coordinates of polygon in array are given clockwise:
+    direction = check_clockwise(polygon)
 
-  # Checking if the coordinates of polygon in array are given clockwise:
-  direction = check_clockwise(polygon)
+    # Calculating the rotation angle
+    angle = direction * math.pi * 2 / n  # angle in radians
 
-  # Calculating the rotation angle
-  angle = direction*math.pi*2/n   # angle in radians
+    # Obtaining intermediate polygon
+    intermediate_polygon = []
 
-  # Obtaining intermediate polygon
-  intermediate_polygon = []
+    # Rotating all points of polygon counterclockwise by angle*i around centroid to create intermediate polygon
+    for point in polygon:
+        i = polygon.index(point)
+        intermediate_point = rotate(origin, point, angle * i)
+        intermediate_polygon.append(intermediate_point)
 
-  # Rotating all points of polygon counterclockwise by angle*i around centroid to create intermediate polygon
-  for point in polygon:
-    i = polygon.index(point)
-    intermediate_point = rotate(origin,point,angle*i)
-    intermediate_polygon.append(intermediate_point)
+    # Obtaining Cn symmetry
 
-  # Obtaining Cn symmetry
+    # Calculating avg of points (point P) in intermediate polygon:
+    P = centroid_calc(intermediate_polygon, n)
 
-  # Calculating avg of points (point P) in intermediate polygon:
-  P = centroid_calc(intermediate_polygon,n)
+    # Adding P as one of the points of symmetrical polygon
+    symmetrical_polygon = [P]
 
-  # Adding P as one of the points of symmetrical polygon
-  symmetrical_polygon = [P]
+    # Rotating P (n-1) times clockwise by angle*i around centroid to create symmetrical polygon
+    for i in range(1, n):
+        point = rotate(origin, P, (-angle) * i)
+        symmetrical_polygon.append(point)
 
-  # Rotating P (n-1) times clockwise by angle*i around centroid to create symmetrical polygon
-  for i in range(1,n):
-    point = rotate(origin,P,(-angle)*i)
-    symmetrical_polygon.append(point)
+    # Calculating CSM
 
-  # Calculating CSM
+    distance_pow2_sum = 0  # sum of exponated distances
 
-  distance_pow2_sum = 0 # sum of exponated distances
+    for i in range(0, n):
+        # calculating distance as length of vector - sqrt((x1-x0)**2 + (y1-y0)**2)
+        distance = math.sqrt(
+            (symmetrical_polygon[i][0] - polygon[i][0]) ** 2
+            + (symmetrical_polygon[i][1] - polygon[i][1]) ** 2
+        )
+        distance_pow2_sum += distance**2
 
-  for i in range(0,n):
-    # calculating distance as length of vector - sqrt((x1-x0)**2 + (y1-y0)**2)
-    distance = math.sqrt((symmetrical_polygon[i][0]-polygon[i][0])**2 + (symmetrical_polygon[i][1]-polygon[i][1])**2)
-    distance_pow2_sum += distance**2
+    # Calsulating area of symmetrical polygon - used for further normalization of CSM
+    symm_centroid = centroid_calc(symmetrical_polygon, n)
+    S = area_of_symm_polygon(symmetrical_polygon, symm_centroid, n)
 
-  # Calsulating area of symmetrical polygon - used for further normalization of CSM
-  symm_centroid = centroid_calc(symmetrical_polygon,n)
-  S = area_of_symm_polygon(symmetrical_polygon,symm_centroid,n)
+    CSM = distance_pow2_sum / (n * S)
 
-  CSM = (distance_pow2_sum/(n*S))
+    return CSM
 
-  return CSM
 
 def get_regions(vor):
-
     """
     Filtering and composing regions from scipy.spatial.voronoi.regions
     Creates an array of coordinates of vertices
@@ -149,8 +176,8 @@ def get_regions(vor):
 
     return new_regions
 
-def CSM_for_graph(vor):
 
+def CSM_for_graph(vor):
     """
     Applies the previous CSM_calc function to an array of regions
     """

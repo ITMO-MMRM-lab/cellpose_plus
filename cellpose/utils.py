@@ -1,12 +1,20 @@
 """
 Copyright © 2023 Howard Hughes Medical Institute, Authored by Carsen Stringer and Marius Pachitariu.
 """
+
 import logging
 import os, tempfile, shutil, io, pathlib
 from tqdm import tqdm, trange
 from urllib.request import urlopen
 import cv2
-from scipy.ndimage import find_objects, gaussian_filter, generate_binary_structure, label, maximum_filter1d, binary_fill_holes
+from scipy.ndimage import (
+    find_objects,
+    gaussian_filter,
+    generate_binary_structure,
+    label,
+    maximum_filter1d,
+    binary_fill_holes,
+)
 from scipy.spatial import ConvexHull
 import numpy as np
 import colorsys
@@ -20,6 +28,7 @@ from PIL import Image
 
 try:
     from skimage.morphology import remove_small_holes
+
     SKIMAGE_ENABLED = True
 except:
     SKIMAGE_ENABLED = False
@@ -27,26 +36,81 @@ except:
 
 class TqdmToLogger(io.StringIO):
     """
-        Output stream for TQDM which will output to logger module instead of
-        the StdOut.
+    Output stream for TQDM which will output to logger module instead of
+    the StdOut.
     """
+
     logger = None
     level = None
     buf = ""
 
     def __init__(self, logger, level=None):
+        """
+        Initializes the TqdmToLogger instance.
+
+            This method initializes the TqdmToLogger object with a logger
+            instance and a logging level. If no level is specified, it defaults
+            to logging.INFO.
+
+            Args:
+                logger: The logger instance used for logging progress.
+                level: The logging level to be used (default is INFO).
+
+            Returns:
+                None
+        """
         super(TqdmToLogger, self).__init__()
         self.logger = logger
         self.level = level or logging.INFO
 
     def write(self, buf):
+        """
+        Write a buffer to the object's internal storage after stripping whitespace.
+
+            This method takes an input buffer and removes any leading or trailing
+            whitespace characters (space, tab, carriage return, newline) before
+            storing it in the object's internal buffer.
+
+            Args:
+                buf: The input buffer as a string to be processed and stored.
+
+            Returns:
+                None: This method does not return a value.
+        """
         self.buf = buf.strip("\r\n\t ")
 
     def flush(self):
+        """
+        Flushes the current buffer by logging its contents.
+
+            This method logs the contents of the buffer using the configured logger
+            at the specified log level.
+
+            Parameters:
+                None
+
+            Returns:
+                None
+        """
         self.logger.log(self.level, self.buf)
 
 
 def rgb_to_hsv(arr):
+    """
+    Convert an RGB image array to HSV format.
+
+        This method takes an RGB image represented as a NumPy array and converts it
+        into its corresponding HSV (Hue, Saturation, Value) representation.
+
+        Args:
+            arr: A NumPy array representing an RGB image. The last dimension of
+                  the array should represent the color channels (Red, Green, Blue).
+
+        Returns:
+            A NumPy array representing the image in HSV format, with the same dimensions
+            as the input array, where the last dimension corresponds to the HSV channels
+            (Hue, Saturation, Value).
+    """
     rgb_to_hsv_channels = np.vectorize(colorsys.rgb_to_hsv)
     r, g, b = np.rollaxis(arr, axis=-1)
     h, s, v = rgb_to_hsv_channels(r, g, b)
@@ -55,19 +119,49 @@ def rgb_to_hsv(arr):
 
 
 def hsv_to_rgb(arr):
+    """
+    Convert an HSV color array to an RGB color array.
+
+        This method takes an array representing colors in the HSV color space
+        and converts it to the RGB color space. The input array is expected
+        to have the last dimension representing the channels, with
+        hue, saturation, and value.
+
+        Args:
+            arr: An N-D array where the last dimension contains the HSV values,
+                  which are in the form [hue, saturation, value].
+
+        Returns:
+            An N-D array with the same shape as the input, where the last
+            dimension contains the corresponding RGB values.
+    """
     hsv_to_rgb_channels = np.vectorize(colorsys.hsv_to_rgb)
     h, s, v = np.rollaxis(arr, axis=-1)
     r, g, b = hsv_to_rgb_channels(h, s, v)
     rgb = np.stack((r, g, b), axis=-1)
     return rgb
 
+
 def download_font():
+    """
+    Download the DejaVuSans font if it is not already present.
+
+        This method checks if the DejaVuSans font file is located in the
+        user's home directory under the path '.cellpose'. If the font file
+        does not exist, it downloads the font from a specified URL.
+
+        Parameters:
+            None
+
+        Returns:
+            None
+    """
     dejavu_font_path = pathlib.Path.home().joinpath(".cellpose", "DejaVuSans.ttf")
     dejavu_font_url = "https://github.com/ITMO-MMRM-lab/cellpose/blob/main/cellpose/resources/DejaVuSans.ttf?raw=true"
     if not dejavu_font_path.is_file():
         print("downloading font")
-        download_url_to_file(dejavu_font_url,
-                            dejavu_font_path, progress=True)
+        download_url_to_file(dejavu_font_url, dejavu_font_path, progress=True)
+
 
 def download_url_to_file(url, dst, progress=True):
     r"""Download object at the given URL to a local path.
@@ -80,6 +174,7 @@ def download_url_to_file(url, dst, progress=True):
     """
     file_size = None
     import ssl
+
     ssl._create_default_https_context = ssl._create_unverified_context
     u = urlopen(url)
     meta = u.info()
@@ -94,8 +189,13 @@ def download_url_to_file(url, dst, progress=True):
     dst_dir = os.path.dirname(dst)
     f = tempfile.NamedTemporaryFile(delete=False, dir=dst_dir)
     try:
-        with tqdm(total=file_size, disable=not progress, unit="B", unit_scale=True,
-                  unit_divisor=1024) as pbar:
+        with tqdm(
+            total=file_size,
+            disable=not progress,
+            unit="B",
+            unit_scale=True,
+            unit_divisor=1024,
+        ) as pbar:
             while True:
                 buffer = u.read(8192)
                 if len(buffer) == 0:
@@ -124,7 +224,9 @@ def distance_to_boundary(masks):
 
     """
     if masks.ndim > 3 or masks.ndim < 2:
-        raise ValueError("distance_to_boundary takes 2D or 3D array, not %dD array" % masks.ndim)
+        raise ValueError(
+            "distance_to_boundary takes 2D or 3D array, not %dD array" % masks.ndim
+        )
     dist_to_bound = np.zeros(masks.shape, np.float64)
 
     if masks.ndim == 3:
@@ -137,10 +239,14 @@ def distance_to_boundary(masks):
             if si is not None:
                 sr, sc = si
                 mask = (masks[sr, sc] == (i + 1)).astype(np.uint8)
-                contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                contours = cv2.findContours(
+                    mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+                )
                 pvc, pvr = np.concatenate(contours[-2], axis=0).squeeze().T
                 ypix, xpix = np.nonzero(mask)
-                min_dist = ((ypix[:, np.newaxis] - pvr)**2 + (xpix[:, np.newaxis] - pvc)**2).min(axis=1)
+                min_dist = (
+                    (ypix[:, np.newaxis] - pvr) ** 2 + (xpix[:, np.newaxis] - pvc) ** 2
+                ).min(axis=1)
                 dist_to_bound[ypix + sr.start, xpix + sc.start] = min_dist
         return dist_to_bound
 
@@ -198,7 +304,9 @@ def masks_to_outlines(masks):
         outlines (2D or 3D array): Size [Ly x Lx] or [Lz x Ly x Lx], where True pixels are outlines.
     """
     if masks.ndim > 3 or masks.ndim < 2:
-        raise ValueError("masks_to_outlines takes 2D or 3D array, not %dD array" % masks.ndim)
+        raise ValueError(
+            "masks_to_outlines takes 2D or 3D array, not %dD array" % masks.ndim
+        )
     outlines = np.zeros(masks.shape, bool)
 
     if masks.ndim == 3:
@@ -211,7 +319,9 @@ def masks_to_outlines(masks):
             if si is not None:
                 sr, sc = si
                 mask = (masks[sr, sc] == (i + 1)).astype(np.uint8)
-                contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                contours = cv2.findContours(
+                    mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
+                )
                 pvc, pvr = np.concatenate(contours[-2], axis=0).squeeze().T
                 vr, vc = pvr + sr.start, pvc + sc.start
                 outlines[vr, vc] = 1
@@ -240,12 +350,13 @@ def outlines_list(masks, multiprocessing_threshold=1000, multiprocessing=None):
     if multiprocessing is None:
         few_masks = np.max(masks) < multiprocessing_threshold
         multiprocessing = not few_masks
-    
+
     # disable multiprocessing for Windows
     if os.name == "nt":
         if multiprocessing:
             logging.getLogger(__name__).warning(
-                "Multiprocessing is disabled for Windows")
+                "Multiprocessing is disabled for Windows"
+            )
         multiprocessing = False
 
     if multiprocessing:
@@ -268,8 +379,11 @@ def outlines_list_single(masks):
     for n in np.unique(masks)[1:]:
         mn = masks == n
         if mn.sum() > 0:
-            contours = cv2.findContours(mn.astype(np.uint8), mode=cv2.RETR_EXTERNAL,
-                                        method=cv2.CHAIN_APPROX_NONE)
+            contours = cv2.findContours(
+                mn.astype(np.uint8),
+                mode=cv2.RETR_EXTERNAL,
+                method=cv2.CHAIN_APPROX_NONE,
+            )
             contours = contours[-2]
             cmax = np.argmax([c.shape[0] for c in contours])
             pix = contours[cmax].astype(int).squeeze()
@@ -298,6 +412,7 @@ def outlines_list_multi(masks, num_processes=None):
         outpix = pool.map(get_outline_multi, [(masks, n) for n in unique_masks])
     return outpix
 
+
 def get_outline_multi(args):
     """Get the outline of a specific mask in a multi-mask image.
 
@@ -311,13 +426,15 @@ def get_outline_multi(args):
     masks, n = args
     mn = masks == n
     if mn.sum() > 0:
-        contours = cv2.findContours(mn.astype(np.uint8), mode=cv2.RETR_EXTERNAL,
-                                    method=cv2.CHAIN_APPROX_NONE)
+        contours = cv2.findContours(
+            mn.astype(np.uint8), mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_NONE
+        )
         contours = contours[-2]
         cmax = np.argmax([c.shape[0] for c in contours])
         pix = contours[cmax].astype(int).squeeze()
         return pix if len(pix) > 4 else np.zeros((0, 2))
     return np.zeros((0, 2))
+
 
 def dilate_masks(masks, n_iter=5):
     """Dilate masks by n_iter pixels.
@@ -334,8 +451,9 @@ def dilate_masks(masks, n_iter=5):
         # define the structuring element to use for dilation
         kernel = np.ones((3, 3), "uint8")
         # find the distance to each mask (distances are zero within masks)
-        dist_transform = cv2.distanceTransform((dilated_masks == 0).astype("uint8"),
-                                               cv2.DIST_L2, 5)
+        dist_transform = cv2.distanceTransform(
+            (dilated_masks == 0).astype("uint8"), cv2.DIST_L2, 5
+        )
         # dilate each mask and assign to it the pixels along the border of the mask
         # (does not allow dilation into other masks since dist_transform is zero there)
         for i in range(1, np.max(masks) + 1):
@@ -344,6 +462,7 @@ def dilate_masks(masks, n_iter=5):
             dilated_mask = np.logical_and(dist_transform < 2, dilated_mask)
             dilated_masks[dilated_mask > 0] = i
     return dilated_masks
+
 
 def get_perimeter(points):
     """
@@ -358,7 +477,7 @@ def get_perimeter(points):
     """
     if points.shape[0] > 4:
         points = np.append(points, points[:1], axis=0)
-        return ((np.diff(points, axis=0)**2).sum(axis=1)**0.5).sum()
+        return ((np.diff(points, axis=0) ** 2).sum(axis=1) ** 0.5).sum()
     else:
         return 0
 
@@ -366,10 +485,10 @@ def get_perimeter(points):
 def get_mask_compactness(masks):
     """
     Calculate the compactness of masks.
-    
+
     Parameters:
         masks (ndarray): Binary masks representing objects.
-        
+
     Returns:
         ndarray: Array of compactness values for each mask.
     """
@@ -396,10 +515,14 @@ def get_mask_perimeters(masks):
     for n in range(masks.max()):
         mn = masks == (n + 1)
         if mn.sum() > 0:
-            contours = cv2.findContours(mn.astype(np.uint8), mode=cv2.RETR_EXTERNAL,
-                                        method=cv2.CHAIN_APPROX_NONE)[-2]
+            contours = cv2.findContours(
+                mn.astype(np.uint8),
+                mode=cv2.RETR_EXTERNAL,
+                method=cv2.CHAIN_APPROX_NONE,
+            )[-2]
             perimeters[n] = np.array(
-                [get_perimeter(c.astype(int).squeeze()) for c in contours]).sum()
+                [get_perimeter(c.astype(int).squeeze()) for c in contours]
+            ).sum()
 
     return perimeters
 
@@ -421,7 +544,7 @@ def circleMask(d0):
     dy = np.tile(np.arange(-d0[0], d0[0] + 1), (2 * d0[1] + 1, 1))
     dy = dy.transpose()
 
-    rs = (dy**2 + dx**2)**0.5
+    rs = (dy**2 + dx**2) ** 0.5
     return rs, dx, dy
 
 
@@ -457,8 +580,8 @@ def get_mask_stats(masks_true):
         if len(points) > 15 and mask_perimeters[ic] > 0:
             med = np.median(points, axis=0)
             # compute compactness of ROI
-            r2 = ((points - med)**2).sum(axis=1)**0.5
-            compactness[ic] = (rsort[:r2.size].mean() + 1e-10) / r2.mean()
+            r2 = ((points - med) ** 2).sum(axis=1) ** 0.5
+            compactness[ic] = (rsort[: r2.size].mean() + 1e-10) / r2.mean()
             try:
                 hull = ConvexHull(points)
                 convex_perimeters[ic] = hull.area
@@ -466,10 +589,13 @@ def get_mask_stats(masks_true):
             except:
                 convex_perimeters[ic] = 0
 
-    convexity[mask_perimeters > 0.0] = (convex_perimeters[mask_perimeters > 0.0] /
-                                        mask_perimeters[mask_perimeters > 0.0])
-    solidity[convex_areas > 0.0] = (areas[convex_areas > 0.0] /
-                                    convex_areas[convex_areas > 0.0])
+    convexity[mask_perimeters > 0.0] = (
+        convex_perimeters[mask_perimeters > 0.0]
+        / mask_perimeters[mask_perimeters > 0.0]
+    )
+    solidity[convex_areas > 0.0] = (
+        areas[convex_areas > 0.0] / convex_areas[convex_areas > 0.0]
+    )
     convexity = np.clip(convexity, 0.0, 1.0)
     solidity = np.clip(solidity, 0.0, 1.0)
     compactness = np.clip(compactness, 0.0, 1.0)
@@ -500,14 +626,19 @@ def get_masks_unet(output, cell_threshold=0, boundary_threshold=0):
         pad = 10
         for i, slc in enumerate(slices):
             if slc is not None:
-                slc_pad = tuple([
-                    slice(max(0, sli.start - pad), min(labels.shape[j], sli.stop + pad))
-                    for j, sli in enumerate(slc)
-                ])
+                slc_pad = tuple(
+                    [
+                        slice(
+                            max(0, sli.start - pad),
+                            min(labels.shape[j], sli.stop + pad),
+                        )
+                        for j, sli in enumerate(slc)
+                    ]
+                )
                 msk = (labels[slc_pad] == (i + 1)).astype(np.float32)
                 msk = 1 - gaussian_filter(msk, 5)
                 dists[slc_pad] = np.minimum(dists[slc_pad], msk)
-                mins[slc_pad][dists[slc_pad] == msk] = (i + 1)
+                mins[slc_pad][dists[slc_pad] == msk] = i + 1
         labels[labels == 0] = borders[labels == 0] * mins[labels == 0]
 
     masks = labels
@@ -617,8 +748,9 @@ def size_distribution(masks):
     counts = np.unique(masks, return_counts=True)[1][1:]
     return np.percentile(counts, 25) / np.percentile(counts, 75)
 
+
 def fill_holes_and_remove_small_masks(masks, min_size=15):
-    """ Fills holes in masks (2D/3D) and discards masks smaller than min_size.
+    """Fills holes in masks (2D/3D) and discards masks smaller than min_size.
 
     This function fills holes in each mask using scipy.ndimage.morphology.binary_fill_holes.
     It also removes masks that are smaller than the specified min_size.
@@ -638,8 +770,9 @@ def fill_holes_and_remove_small_masks(masks, min_size=15):
     """
 
     if masks.ndim > 3 or masks.ndim < 2:
-        raise ValueError("masks_to_outlines takes 2D or 3D array, not %dD array" %
-                         masks.ndim)
+        raise ValueError(
+            "masks_to_outlines takes 2D or 3D array, not %dD array" % masks.ndim
+        )
 
     slices = find_objects(masks)
     j = 0
@@ -655,6 +788,6 @@ def fill_holes_and_remove_small_masks(masks, min_size=15):
                         msk[k] = binary_fill_holes(msk[k])
                 else:
                     msk = binary_fill_holes(msk)
-                masks[slc][msk] = (j + 1)
+                masks[slc][msk] = j + 1
                 j += 1
     return masks

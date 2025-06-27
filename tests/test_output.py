@@ -3,8 +3,10 @@ from pathlib import Path
 from subprocess import check_output, STDOUT
 import os, shutil
 import numpy as np
+
 try:
     import matplotlib.pyplot as plt
+
     MATPLOTLIB = True
 except:
     MATPLOTLIB = False
@@ -13,6 +15,20 @@ r_tol, a_tol = 1e-2, 1e-2
 
 
 def clear_output(data_dir, image_names):
+    """
+    Removes cached output mask files for given image names.
+
+        This method traverses the specified list of image names and deletes
+        the corresponding cached mask files from a predefined output directory
+        based on whether the image is 2D or 3D.
+
+        Args:
+            data_dir: The directory path where the images are stored.
+            image_names: A list of image names for which cached mask files should be removed.
+
+        Returns:
+            None
+    """
     data_dir_2D = data_dir.joinpath("2D")
     data_dir_3D = data_dir.joinpath("2D")
     for image_name in image_names:
@@ -27,7 +43,23 @@ def clear_output(data_dir, image_names):
         if os.path.exists(output):
             os.remove(output)
 
+
 def test_class_2D(data_dir, image_names):
+    """
+    Evaluate and visualize segmentation of 2D images using the Cellpose model.
+
+        This method processes a specified 2D image, applies the Cellpose segmentation
+        model to it, and saves the resulting segmentation masks. It also optionally
+        displays the segmentation results using Matplotlib.
+
+        Args:
+            data_dir: The directory containing the image data.
+            image_names: A list of image names to process.
+
+        Returns:
+            None: This method does not return a value but saves the segmentation masks
+            and shows the segmentation results when applicable.
+    """
     clear_output(data_dir, image_names)
     image_name = "rgb_2D.png"
     img = io.imread(str(data_dir.joinpath("2D").joinpath(image_name)))
@@ -36,18 +68,37 @@ def test_class_2D(data_dir, image_names):
     chan2 = [0]
     for m, model_type in enumerate(model_types):
         model = models.Cellpose(model_type=model_type)
-        masks, flows, _, _ = model.eval(img, diameter=0, cellprob_threshold=0,
-                                        channels=[chan[m], chan2[m]], resample=False)
+        masks, flows, _, _ = model.eval(
+            img,
+            diameter=0,
+            cellprob_threshold=0,
+            channels=[chan[m], chan2[m]],
+            resample=False,
+        )
         io.imsave(str(data_dir.joinpath("2D").joinpath("rgb_2D_cp_masks.png")), masks)
         compare_masks(data_dir, [image_name], "2D", model_type)
         clear_output(data_dir, image_names)
         if MATPLOTLIB:
             fig = plt.figure(figsize=(8, 3))
-            plot.show_segmentation(fig, img, masks, flows[0],
-                                   channels=[chan[m], chan2[m]])
+            plot.show_segmentation(
+                fig, img, masks, flows[0], channels=[chan[m], chan2[m]]
+            )
 
 
 def test_cyto2_to_seg(data_dir, image_names):
+    """
+    Test the conversion of cell images to segmentation masks using the Cellpose model.
+
+        This method reads cell images from a specified directory, applies the Cellpose model
+        to generate segmentation masks, and saves the results.
+
+        Args:
+            data_dir: The directory containing the images for processing.
+            image_names: A list of image file names to be processed.
+
+        Returns:
+            None
+    """
     clear_output(data_dir, image_names)
     image_names = ["rgb_2D.png", "rgb_2D_tif.tif"]
     file_names = [
@@ -62,6 +113,22 @@ def test_cyto2_to_seg(data_dir, image_names):
 
 
 def test_class_3D(data_dir, image_names):
+    """
+    Tests the 3D cell segmentation using the Cellpose model.
+
+        This method loads a 3D image from the specified directory, applies the
+        Cellpose segmentation model to identify cell nuclei, and saves the
+        resulting masks to the same directory. It also compares the generated
+        masks with the original images.
+
+        Args:
+            data_dir: The directory where the images are stored.
+            image_names: A list of image names to process.
+
+        Returns:
+            None: This method does not return a value, but saves the segmented
+            masks to the specified directory.
+    """
     clear_output(data_dir, image_names)
     img = io.imread(str(data_dir.joinpath("3D").joinpath("rgb_3D.tif")))
     model_types = ["nuclei"]
@@ -69,21 +136,41 @@ def test_class_3D(data_dir, image_names):
     chan2 = [0]
     for m, model_type in enumerate(model_types):
         model = models.Cellpose(model_type="nuclei")
-        masks = model.eval(img, do_3D=True, diameter=25, 
-                           channels=[chan[m], chan2[m]], resample=True)[0]
+        masks = model.eval(
+            img, do_3D=True, diameter=25, channels=[chan[m], chan2[m]], resample=True
+        )[0]
         io.imsave(str(data_dir.joinpath("3D").joinpath("rgb_3D_cp_masks.tif")), masks)
         compare_masks(data_dir, ["rgb_3D.tif"], "3D", model_type)
         clear_output(data_dir, image_names)
 
 
 def test_cli_2D(data_dir, image_names):
+    """
+    Runs the Cellpose model for 2D image segmentation and compares the resulting masks.
+
+        This method prepares the environment by clearing previous outputs, constructs and executes
+        a command line interface (CLI) call to the Cellpose model for 2D segmentation, and then
+        compares the generated masks against the expected output.
+
+        Args:
+            data_dir: The directory containing the input images and output masks.
+            image_names: A list of names of the images to be processed.
+
+        Raises:
+            ValueError: If an error occurs during the execution of the Cellpose command.
+
+        Returns:
+            None
+    """
     clear_output(data_dir, image_names)
     model_types = ["cyto"]
     chan = [2]
     chan2 = [1]
     for m, model_type in enumerate(model_types):
-        cmd = "python -m cellpose --dir %s --pretrained_model %s --no_resample --chan %d --chan2 %d --diameter 0 --save_png --verbose" % (
-            str(data_dir.joinpath("2D")), model_type, chan[m], chan2[m])
+        cmd = (
+            "python -m cellpose --dir %s --pretrained_model %s --no_resample --chan %d --chan2 %d --diameter 0 --save_png --verbose"
+            % (str(data_dir.joinpath("2D")), model_type, chan[m], chan2[m])
+        )
         try:
             cmd_stdout = check_output(cmd, stderr=STDOUT, shell=True).decode()
             print(cmd_stdout)
@@ -95,13 +182,34 @@ def test_cli_2D(data_dir, image_names):
 
 
 def test_cli_3D(data_dir, image_names):
+    """
+    Runs a 3D cell segmentation using the Cellpose model.
+
+        This method clears previously generated output, constructs and executes
+        a shell command to run the Cellpose segmentation in 3D with specified
+        parameters, and compares the generated masks against the expected results.
+
+        Args:
+            data_dir: The directory where input images are stored and output
+                results will be saved.
+            image_names: A list of names of the images to be processed.
+
+        Raises:
+            ValueError: If there is an error during the execution of the
+                segmentation command.
+
+        Returns:
+            None
+    """
     clear_output(data_dir, image_names)
     model_types = ["cyto"]
     chan = [2]
     chan2 = [1]
     for m, model_type in enumerate(model_types):
-        cmd = "python -m cellpose --dir %s --do_3D --pretrained_model %s --no_resample --cellprob_threshold 0 --chan %d --chan2 %d --diameter 25 --save_tif" % (
-            str(data_dir.joinpath("3D")), model_type, chan[m], chan2[m])
+        cmd = (
+            "python -m cellpose --dir %s --do_3D --pretrained_model %s --no_resample --cellprob_threshold 0 --chan %d --chan2 %d --diameter 25 --save_tif"
+            % (str(data_dir.joinpath("3D")), model_type, chan[m], chan2[m])
+        )
         try:
             cmd_stdout = check_output(cmd, stderr=STDOUT, shell=True).decode()
         except Exception as e:
@@ -110,8 +218,9 @@ def test_cli_3D(data_dir, image_names):
         compare_masks(data_dir, image_names, "3D", model_type)
         clear_output(data_dir, image_names)
 
+
 def test_outlines_list(data_dir, image_names):
-    """ test both single and multithreaded by comparing them"""
+    """test both single and multithreaded by comparing them"""
     clear_output(data_dir, image_names)
     model_type = "cyto"
     channels = [2, 1]
@@ -131,13 +240,15 @@ def test_outlines_list(data_dir, image_names):
     outlines_matched = [False] * len(outlines_single)
     for i, outline_single in enumerate(outlines_single):
         for j, outline_multi in enumerate(outlines_multi):
-            if not outlines_matched[j] and np.array_equal(outline_single,
-                                                          outline_multi):
+            if not outlines_matched[j] and np.array_equal(
+                outline_single, outline_multi
+            ):
                 outlines_matched[j] = True
                 break
         else:
             assert False, "Outline not found in outlines_multi: {}".format(
-                outline_single)
+                outline_single
+            )
 
     assert all(outlines_matched), "Not all outlines in outlines_multi were matched"
 
@@ -169,19 +280,27 @@ def compare_masks(data_dir, image_names, runtype, model_type):
                 print("checking output %s" % output_test)
                 masks_test = io.imread(output_test)
                 masks_true = io.imread(output_true)
-                print("masks", np.unique(masks_test), np.unique(masks_true),
-                      output_test, output_true)
+                print(
+                    "masks",
+                    np.unique(masks_test),
+                    np.unique(masks_true),
+                    output_test,
+                    output_true,
+                )
                 thresholds = [0.5, 0.75, 0.9]
-                ap = metrics.average_precision(masks_true, masks_test, 
-                                               threshold=thresholds)[0]
+                ap = metrics.average_precision(
+                    masks_true, masks_test, threshold=thresholds
+                )[0]
                 print("average precision of ", ap)
-                ap_precision = np.allclose(ap, np.ones(len(thresholds)), 
-                                           rtol=r_tol, atol=a_tol)
+                ap_precision = np.allclose(
+                    ap, np.ones(len(thresholds)), rtol=r_tol, atol=a_tol
+                )
 
                 matching_pix = np.logical_and(masks_test > 0, masks_true > 0).mean()
                 all_pix = (masks_test > 0).mean()
-                pix_precision = np.allclose(all_pix, matching_pix, rtol=r_tol,
-                                            atol=a_tol)
+                pix_precision = np.allclose(
+                    all_pix, matching_pix, rtol=r_tol, atol=a_tol
+                )
                 assert all([ap_precision, pix_precision])
             else:
                 print("ERROR: no output file of name %s found" % output_test)
