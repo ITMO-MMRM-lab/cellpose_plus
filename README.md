@@ -13,7 +13,7 @@
 <!-- [![GitHub forks](https://img.shields.io/github/forks/ITMO-MMRM-lab/cellpose?style=social)](https://github.com/ITMO-MMRM-lab/cellpose/) -->
 
 Cellpose plus is a morphological analysis tool that builds on a forked branch of the state-of-the-art image segmentation framework [Cellpose](https://github.com/MouseLand/cellpose). 
-We add feature extraction algorithms to asses morphological properties of cells and nuclei. This way we achieve a single workflow to study stained cells, from raw images to labeled masks with their corresponding measures. \
+We add feature extraction algorithms to assess morphological properties of cells and nuclei. This way we achieve a single workflow to study stained cells, from raw images to labeled masks with their corresponding measures. \
 As the main Cellpose branch continues to grow actively, we aim to keep our forked repository up to date. The latest additions and bug fixes are also present in our repository.
 
 Developed by the InfoChemistry scientific center, part of ITMO University.
