@@ -33,7 +33,10 @@ We suggest installing our fork using `conda` and `pip` (with `python>=3.8`).
 6. To install the latest PyPi release of Cellpose plus and its dependencies (see [setup.py](https://github.com/ITMO-MMRM-lab/cellpose/blob/main/setup.py)), run:\
   `pip install cellpose-plus[gui]`\
   or `pip install cellpose-plus` for a version without GUI.
+
 (Optional): To install dependencies, you can use requirements.txt via `pip install -r ./cellpose_plus/requirements.txt`
+
+(Optional): When installing cellpose_plus directly from github, the default installation allows for CLI (Command Line Interface) usage. To use GUI (Graphical User Interface) for Cellpose_plus, please install the dependencies in `requirements_GUI.txt` using the command `pip install -r ./cellpose_plus/requirements_GUI.txt`
 
 ### System requirements
 
@@ -75,7 +78,7 @@ Launching Cellpose plus GUI:
 
 - Launch the command line terminal/Anaconda Prompt: 
 - Activate respective environments *conda activite __your_environment__*  (e.g. `conda activate cellpose_plus`) 
-- Enter to launch the GUI `python -m cellpose`
+- Enter to launch the GUI `python -m cellpose_plus`
 - Now, you can load or drag-drop your desired image for segmentation
 
 Further, we present a usage example:
