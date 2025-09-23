@@ -5,6 +5,64 @@ from PIL import Image, ImageDraw, ImageFont
 import pathlib
 
 
+def calculate_brightness_values(image, mask, channel, subtract_background=True):
+    """
+    Calculates brightness values for each cell in the mask.
+    
+    :param image: image numpy array
+    :param mask: mask numpy array
+    :param channel: how to calculate brightness (0-red, 1-green, 2-blue, 3-average)
+    :param subtract_background: if True, subtracts background brightness
+    :return: tuple (data DataFrame, center_coords list, brightness_map array)
+    """
+    # Extract brightness channel
+    if 0 <= channel <= 2:
+        brightness = image[:, :, channel]
+    elif channel == 3:
+        brightness = np.mean(image, axis=2)
+    else:
+        raise ValueError("Channel must be 0 (red), 1 (green), 2 (blue), or 3 (gray)")
+
+    # Get unique cell IDs
+    object_ids = np.unique(mask)
+    object_ids = object_ids[object_ids != 0]
+    
+    if len(object_ids) == 0:
+        return None, None, None
+    
+    # Calculate background brightness
+    background_brightness = 0
+    if subtract_background:
+        background_mask = (mask == 0)
+        if np.any(background_mask):
+            background_brightness = brightness[background_mask].mean()
+    
+    # Calculate brightness for each cell
+    data = []
+    center_coords = []
+    
+    for obj_id in object_ids:
+        obj_mask = (mask == obj_id)
+        mean_brightness = brightness[obj_mask].mean() - background_brightness
+        data.append({'id': obj_id, 'mean_brightness': mean_brightness})
+        
+        # Calculate center coordinates
+        coords = np.column_stack(np.where(obj_mask))
+        center_x = coords[:, 1].mean()
+        center_y = coords[:, 0].mean()
+        center_coords.append((center_x, center_y))
+    
+    # Create brightness map
+    brightness_map = np.zeros_like(brightness)
+    for obj_id in object_ids:
+        obj_mask = (mask == obj_id)
+        mean_brightness = next(item['mean_brightness'] for item in data if item['id'] == obj_id)
+        # mean_brightness = data.loc[data['id'] == obj_id, 'mean_brightness'].values[0]
+        brightness_map[obj_mask] = mean_brightness
+    
+    return pd.DataFrame(data), center_coords, brightness_map
+
+  
 def calculate_cell_brightness(image, mask, filepath, channel, subtract_background=True, logger=None):
     """
     Calculates cell brightness and saves results to `*image-folder*/*image-name*/brightness/`
@@ -23,103 +81,92 @@ def calculate_cell_brightness(image, mask, filepath, channel, subtract_backgroun
         if logger:
             logger.info("No image data provided")
         return "No image data provided"
-
+  
     image = image[0]
     mask = mask[0]
-    if 0 <= channel <= 2:
-        brightness = image[:, :, channel]
-    elif channel == 3:
-        brightness = np.mean(image, axis=2)
-    else:
+    
+    # Calculate brightness values
+    try:
+        data, center_coords, brightness_map = calculate_brightness_values(
+            image, mask, channel, subtract_background
+        )
+    except ValueError as e:
         if logger:
-            logger.info("Invalid channel specified")
-        raise ValueError("Channel must be 0 (red), 1 (green), 2 (blue), or 3 (gray)")
-
-    filename = "cell_brightness"
-    channel_filename = ["red", "green", "blue", "gray"]
-    filename += f"_{channel_filename[channel]}"
-
-    # Calculating brightness of every cell
-    object_ids = np.unique(mask)
-    object_ids = object_ids[object_ids != 0]
-    if len(object_ids) == 0:
+            logger.info(f"Invalid channel specified: {e}")
+        raise
+    
+    if data is None:
         if logger:
             logger.info("No cells found in the mask")
         return "No cells found in the mask"
-
-    # Estimate background
-    background_brightness = 0
-    if subtract_background:
-        background_mask = (mask == 0)
-        if np.any(background_mask):
-            background_brightness = brightness[background_mask].mean()
-        else:
-            background_brightness = 0
-
-    data = []
-    center_coords = []
-    for obj_id in object_ids:
-        obj_mask = (mask == obj_id)
-        mean_brightness = brightness[obj_mask].mean() - background_brightness
-        data.append({'id': obj_id, 'mean_brightness': mean_brightness})
-
-        coords = np.column_stack(np.where(obj_mask))
-        center_x = coords[:, 1].mean()
-        center_y = coords[:, 0].mean()
-        center_coords.append((center_x, center_y))
-
-    data = pd.DataFrame(data)
-
+    
+    # Prepare filenames
+    channel_filename = ["red", "green", "blue", "gray"]
+    filename = f"cell_brightness_{channel_filename[channel]}"
+    
+    # Create directories
     results_dir = os.path.splitext(filepath)[0]
     brightness_dir = os.path.join(results_dir, "brightness")
-
+    
     if not os.path.exists(results_dir):
         os.makedirs(results_dir)
     if not os.path.exists(brightness_dir):
         os.makedirs(brightness_dir)
     
+    # Save CSV
     data.to_csv(os.path.join(brightness_dir, f"{filename}.csv"), index=False)
-
+    
     if logger:
         logger.info("Brightness of all cells is calculated")
-
-    # Colormap (index cells)
+    
+    # Create and save colormap
+    object_ids = data['id'].values
     colormap_mask = Image.fromarray(create_colormap_mask(mask))
     im_masks = label_image(colormap_mask, object_ids, center_coords)
     im_masks.save(os.path.join(brightness_dir, "mask_colormap.png"))
-
+    
     if logger:
         logger.info("Colormap is created")
+    
+    # Create and save brightness visualization map
+    brightness_image = create_brightness_visualization(brightness_map, data, center_coords)
+    brightness_image.save(os.path.join(brightness_dir, f"{filename}_visualization_map.png"))
+    
+    if logger:
+        logger.info("Brightness visualization map is created")
+    
+    return "Done! Results saved to folder"
 
-    # Brightness visualization map
-    brightness_map = np.zeros_like(brightness)
 
-    for obj_id in object_ids:
-        obj_mask = (mask == obj_id)
-        mean_brightness = data.loc[data['id'] == obj_id, 'mean_brightness'].values[0]
-        brightness_map[obj_mask] = mean_brightness
-
+def create_brightness_visualization(brightness_map, data, center_coords):
+    """
+    Creates a brightness visualization image with labeled values.
+    
+    :param brightness_map: numpy array with brightness values
+    :param data: DataFrame with brightness data
+    :param center_coords: list of center coordinates for labels
+    :return: PIL Image object
+    """
     # Make brightness map more contrastive
     vmin = brightness_map[brightness_map > 0].min()
     vmax = brightness_map.max()
     brightness_norm = (brightness_map - vmin) / (vmax - vmin + 1e-8)
     brightness_norm = np.clip(brightness_norm, 0, 1)
+    
     gamma = 0.5
     brightness_gamma = np.power(brightness_norm, gamma)
     brightness_map_scaled = (brightness_gamma * 255).astype(np.uint8)
-
+    
+    # Create image and add labels
     brightness_image = Image.fromarray(brightness_map_scaled)
     brightness_image = brightness_image.convert("L")
-    brightness_image = label_image(brightness_image, data['mean_brightness'].map(lambda x: f"{x:.2f}"), center_coords, color=255)
-    brightness_image.save(os.path.join(brightness_dir, f"{filename}_visualization_map.png"))
-
-    if logger:
-        logger.info("Brightness visualization map is created")
-
-    return "Done! Results saved to folder"
+    brightness_labels = data['mean_brightness'].map(lambda x: f"{x:.2f}")
+    brightness_image = label_image(brightness_image, brightness_labels, center_coords, color=255)
+    
+    return brightness_image
 
 
-def create_colormap_mask( mask):
+def create_colormap_mask(mask):
     colormap = ((np.random.rand(1000000,3)*0.8+0.1)*255).astype(np.uint8)
     tmp_mask = np.copy(mask).astype(np.uint8)
 
