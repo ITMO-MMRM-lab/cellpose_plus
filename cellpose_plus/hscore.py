@@ -69,9 +69,14 @@ def hscore(input_csv_path, output_csv_path=None):
         counts = df['class_intensity'].value_counts()
         total_count = len(df)
         
-       
-       
-       
+         
+        # counting ratios
+        weak_ratio = counts.get('weak', 0) / total_count * 100
+        mean_ratio = counts.get('mean', 0) / total_count * 100
+        strong_ratio = counts.get('strong', 0) / total_count * 100
+        
+        # counting H-score
+        h_score = 1 * weak_ratio + 2 * mean_ratio + 3 * strong_ratio
         
         # make DataFrame with results
         result_data = {
