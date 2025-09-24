@@ -969,7 +969,7 @@ class MainW(QMainWindow):
         ## Cell brightness
         b += 1
         b0 += 1
-        self.brightnessGroup = QGroupBox('Cell brightness')
+        self.brightnessGroup = QGroupBox('Cell brightness / h-score')
         self.brightnessGroup.setFont(self.boldfont)
         self.brightnessGroup.setStyleSheet("QGroupBox { border: 1px solid white; color:white; padding: 10px 0px;}")
         self.brightnessGroupGrid = QGridLayout()

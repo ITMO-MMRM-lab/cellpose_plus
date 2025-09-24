@@ -44,7 +44,8 @@ def calculate_brightness_values(image, mask, channel, subtract_background=True):
     for obj_id in object_ids:
         obj_mask = (mask == obj_id)
         mean_brightness = brightness[obj_mask].mean() - background_brightness
-        data.append({'id': obj_id, 'mean_brightness': mean_brightness})
+        intensity = classify_intensity(mean_brightness)
+        data.append({'id': obj_id, 'mean_brightness': mean_brightness, 'intensity': intensity})
         
         # Calculate center coordinates
         coords = np.column_stack(np.where(obj_mask))
@@ -135,6 +136,12 @@ def calculate_cell_brightness(image, mask, filepath, channel, subtract_backgroun
     if logger:
         logger.info("Brightness visualization map is created")
     
+    h_score, strong_ratio, mean_ratio, weak_ratio, result = calculate_h_score_values(data)
+    result.to_csv(os.path.join(brightness_dir, f"h_score.csv"), index=False)
+
+    if logger:
+        logger.info("H-score is calculated")
+
     return "Done! Results saved to folder"
 
 
@@ -198,3 +205,56 @@ def label_image(image, values, coords, color=(255, 255, 255)):
                 font=font)
 
     return image_labeled
+
+# def classify_intensity(brightness):
+#     if 147 < brightness <= 191:
+#         return "weak"
+#     elif 115 < brightness <= 147:
+#         return "mean"
+#     elif 34 <= brightness <= 115:
+#         return "strong"
+#     else:
+#         return "out_of_range"  
+
+def classify_intensity(brightness):
+    BRIGHTNESS_RANGES = (
+        ("strong", (34, 115)),
+        ("mean", (115, 147)),
+        ("weak", (147, 191))
+    )
+
+    for level, (low, high) in BRIGHTNESS_RANGES:
+        if low <= brightness <= high:
+            return level
+    return "out_of_range"
+
+def calculate_h_score_values(data):
+    """
+    Calculates h_score and ratios.
+    
+    :param data: DataFrame
+    :return: tuple (h_score, strong_ratio, mean_ratio, weak_ratio, result DataFrame)
+    """
+    # Count for intensity
+    counts_intensity = data['intensity'].value_counts()
+    total_count = len(data)
+
+    # Counting ratios
+    strong_count = counts_intensity.get('strong', 0)
+    mean_count = counts_intensity.get('mean', 0)
+    weak_count = counts_intensity.get('weak', 0)
+
+    strong_ratio = strong_count / total_count * 100
+    mean_ratio = mean_count / total_count * 100
+    weak_ratio = weak_count / total_count * 100
+        
+    # Counting H-score
+    h_score = 1 * weak_ratio + 2 * mean_ratio + 3 * strong_ratio
+
+    result = {
+        'metric': ['h_score', 'weak', 'mean', 'strong'],
+        'value': [h_score, weak_ratio, mean_ratio, strong_ratio],
+        'count': [total_count, weak_count, mean_count, strong_count]
+    }
+
+    return h_score, strong_ratio, mean_ratio, weak_ratio, pd.DataFrame(result)
