@@ -6,8 +6,9 @@ import pathlib
 import colorsys
 
 
-def calculate_brightness_values(image, mask, channel, subtract_background=True, logger=None,
-                               rgb_reference_color=None, accuracy=10):
+def calculate_brightness_values(image, mask, channel, subtract_background=True,
+                               rgb_ref_color=None, ref_color_threshold=None,
+                               logger=None):
     """
     Calculates brightness values for each cell in the mask.
     
@@ -15,8 +16,8 @@ def calculate_brightness_values(image, mask, channel, subtract_background=True, 
     :param mask: mask numpy array
     :param channel: how to calculate brightness (0-red, 1-green, 2-blue, 3-average)
     :param subtract_background: if True, subtracts background brightness
-    :param reference_color: tuple (R, G, B) - reference color to exclude
-    :param accuracy: percentage threshold for color matching (0-100)
+    :param ref_color: tuple (R, G, B) - reference color to exclude
+    :param ref_color_threshold: percentage threshold for color matching (0-100)
     :return: tuple (data DataFrame, center_coords list, brightness_map array)
     """
     # Extract brightness channel
@@ -38,46 +39,50 @@ def calculate_brightness_values(image, mask, channel, subtract_background=True, 
     colors = []
     filtered_object_ids = []
 
-    if rgb_reference_color is not None:
-        hsv_reference_color = rgb_to_hsv(rgb_reference_color)
-        logger.info(f"Reference color HSV:{hsv_reference_color}")
+    if rgb_ref_color is not None:
+        hsv_ref_color = rgb_to_hsv(rgb_ref_color)
+        if logger:
+            logger.info(f"Reference color HSV:{hsv_ref_color}")
         for obj_id in object_ids:
             obj_mask = (mask == obj_id)
             # Calculate mean RGB for this cell
-            # mean_r = int(image[:, :, 0][obj_mask].mean())
-            # mean_g = int(image[:, :, 1][obj_mask].mean())
-            # mean_b = int(image[:, :, 2][obj_mask].mean())
-            # logger.info(f"Mean color RGB{(mean_r, mean_g, mean_b)} of ID:{obj_id} cell")
-            median_r = int(np.median(image[:, :, 0][obj_mask]))
-            median_g = int(np.median(image[:, :, 1][obj_mask]))
-            median_b = int(np.median(image[:, :, 2][obj_mask]))
-            logger.info(f"Median color RGB:{(median_r, median_g, median_b)} of cell ID:{obj_id}")
-            cell_color = (median_r, median_g, median_b)
-            median_h, median_s, median_v = rgb_to_hsv(cell_color)
-            logger.info(f"Median color HSV:{(median_h, median_s, median_v)} of cell ID:{obj_id}")
-            hsv_cell_color = (median_h, median_s, median_v)
+            # average_r = int(image[:, :, 0][obj_mask].mean())
+            # average_g = int(image[:, :, 1][obj_mask].mean())
+            # average_b = int(image[:, :, 2][obj_mask].mean())
+            # if logger:
+            #     logger.info(f"Mean color RGB{(mean_r, mean_g, mean_b)} of ID:{obj_id} cell")
+            average_r = int(np.median(image[:, :, 0][obj_mask]))
+            average_g = int(np.median(image[:, :, 1][obj_mask]))
+            average_b = int(np.median(image[:, :, 2][obj_mask]))
+            if logger:
+                logger.info(f"Median color RGB:{(average_r, average_g, average_b)} of cell ID:{obj_id}")
+            cell_color = (average_r, average_g, average_b)
+            average_h, average_s, average_v = rgb_to_hsv(cell_color)
+            if logger:
+                logger.info(f"Average color HSV:{(average_h, average_s, average_v)} of cell ID:{obj_id}")
+            hsv_cell_color = (average_h, average_s, average_v)
 
-            # Check if cell color is within accuracy threshold for RGB
+            # Check if cell color is within ref_color_threshold threshold for RGB
             rgb_excluded = True
-            if not is_rgb_color_match(cell_color, rgb_reference_color, accuracy):
+            if not is_rgb_color_match(cell_color, rgb_ref_color, ref_color_threshold):
                 # filtered_object_ids.append(obj_id)
                 rgb_excluded = False
 
-            # Check if cell color is within accuracy threshold for HSV
+            # Check if cell color is within ref_color_threshold threshold for HSV
             hsv_excluded = True
-            if not is_hsv_color_match(hsv_cell_color, hsv_reference_color, accuracy):
+            if not is_hsv_color_match(hsv_cell_color, hsv_ref_color, ref_color_threshold):
                 filtered_object_ids.append(obj_id)
                 hsv_excluded = False
 
             colors.append({
                 'id': obj_id, 
-                'R': median_r, 
-                'G': median_g, 
-                'B': median_b, 
+                'R': average_r, 
+                'G': average_g, 
+                'B': average_b, 
                 'rgbExcluded': rgb_excluded,
-                'H': median_h, 
-                'S': median_s, 
-                'V': median_v, 
+                'H': average_h, 
+                'S': average_s, 
+                'V': average_v, 
                 'hsvExcluded': hsv_excluded,
             })
 
@@ -139,39 +144,39 @@ def rgb_to_hsv(color):
     return (round(h*360), round(s*100), round(v*100))
 
 
-def is_rgb_color_match(color, reference_color, accuracy_percent):
+def is_rgb_color_match(color, ref_color, ref_color_threshold):
     """
-    Checks if two RGB colors match within accuracy threshold.
+    Checks if two RGB colors match within ref_color_threshold threshold.
     
     :param color: tuple (R, G, B) - color to check
-    :param reference_color: tuple (R, G, B) - reference color  
-    :param accuracy_percent: percentage threshold (0-100)
+    :param ref_color: tuple (R, G, B) - reference color  
+    :param ref_color_threshold: percentage threshold (0-100)
     :return: True if colors match within threshold
     """
     # Calculate percentage difference for each channel
-    for c1, c2 in zip(color, reference_color):
+    for c1, c2 in zip(color, ref_color):
         # Handle case when reference value is 0
         if c2 == 0:
-            if c1 > accuracy_percent * 2.55:  # Convert percentage to 0-255 range
+            if c1 > ref_color_threshold * 2.55:  # Convert percentage to 0-255 range
                 return False
         else:
             percent_diff = abs((c1 - c2) / c2) * 100
-            if percent_diff > accuracy_percent:
+            if percent_diff > ref_color_threshold:
                 return False
     return True
 
 
-def is_hsv_color_match(color, reference_color, accuracy_percent):
+def is_hsv_color_match(color, ref_color, ref_color_threshold):
     """
-    Checks if two HSV colors match within accuracy threshold.
+    Checks if two HSV colors match within ref_color_threshold threshold.
     
     :param color: tuple (H, S, V) - color to check
-    :param reference_color: tuple (H, S, V) - reference color  
-    :param accuracy_percent: percentage threshold (0-100)
+    :param ref_color: tuple (H, S, V) - reference color  
+    :param ref_color_threshold: percentage threshold (0-100)
     :return: True if colors match within threshold
     """
     h1, s1, v1 = color
-    h2, s2, v2 = reference_color
+    h2, s2, v2 = ref_color
     
     # Handle Hue (0-360 degrees, circular)
     # Calculate minimum angular distance between hues
@@ -181,33 +186,34 @@ def is_hsv_color_match(color, reference_color, accuracy_percent):
     
     # Convert angular difference to percentage (180° = 100%)
     h_percent_diff = (h_diff / 180) * 100
-    if h_percent_diff > accuracy_percent:
+    if h_percent_diff > ref_color_threshold:
         return False
     
     # # Handle Saturation (0-100)
     # if s2 == 0:
-    #     if s1 > accuracy_percent:
+    #     if s1 > ref_color_threshold:
     #         return False
     # else:
     #     s_percent_diff = abs((s1 - s2) / s2) * 100
-    #     if s_percent_diff > accuracy_percent:
+    #     if s_percent_diff > ref_color_threshold:
     #         return False
     
     # # Handle Value/Brightness (0-100)
     # if v2 == 0:
-    #     if v1 > accuracy_percent:
+    #     if v1 > ref_color_threshold:
     #         return False
     # else:
     #     v_percent_diff = abs((v1 - v2) / v2) * 100
-    #     if v_percent_diff > accuracy_percent:
+    #     if v_percent_diff > ref_color_threshold:
     #         return False
     
     return True
 
 
 def calculate_cell_brightness(image, mask, filepath, channel, 
-                              subtract_background=True, logger=None,
-                              reference_color=None, accuracy=10):
+                              subtract_background=True,
+                              ref_color=None, ref_color_threshold=None, 
+                              logger=None):
     """
     Calculates cell brightness and saves results to `*image-folder*/*image-name*/brightness/`
 
@@ -220,13 +226,13 @@ def calculate_cell_brightness(image, mask, filepath, channel,
         - `2` - blue channel only
         - `3` - average brightness of all channels
     :param subtract_background: if True, subtracts background brightness from each cell
-    :param reference_color: tuple (R, G, B) - reference color for background cells (0-255 range)
-    :param accuracy: percentage threshold for color matching (0-100)
+    :param ref_color: tuple (R, G, B) - reference color for background cells (0-255 range)
+    :param ref_color_threshold: percentage threshold for color matching (0-100)
      """
     
-    # reference_color = (205, 192, 204)
-    reference_color = (213, 203, 223)
-    accuracy=10
+    # # ref_color = (205, 192, 204)
+    # ref_color = (213, 203, 223)
+    # ref_color_threshold=10
 
     if not image.any():
         if logger:
@@ -237,14 +243,15 @@ def calculate_cell_brightness(image, mask, filepath, channel,
     mask = mask[0]
     
     # Log reference color filtering if enabled
-    if reference_color is not None and logger:
-        logger.info(f"Filtering cells with color close to RGB{reference_color} ± {accuracy}%")
+    if ref_color is not None and logger:
+        logger.info(f"Filtering cells with color close to RGB{ref_color} ± {ref_color_threshold}%")
     
     # Calculate brightness values
     try:
         data, center_coords, brightness_map, colors = calculate_brightness_values(
-            image, mask, channel, subtract_background, logger,
-            reference_color, accuracy
+            image, mask, channel, subtract_background, 
+            ref_color, ref_color_threshold, 
+            logger
         )
     except ValueError as e:
         if logger:
@@ -257,7 +264,7 @@ def calculate_cell_brightness(image, mask, filepath, channel,
         return "No cells found in the mask"
     
     # Log filtering results
-    if reference_color is not None and logger:
+    if ref_color is not None and logger:
         total_cells = len(np.unique(mask[mask != 0]))
         remaining_cells = len(data)
         filtered_out = total_cells - remaining_cells
@@ -280,7 +287,7 @@ def calculate_cell_brightness(image, mask, filepath, channel,
     data.to_csv(os.path.join(brightness_dir, f"{filename}.csv"), index=False)
     
     # Save filtering parameters if reference color was used
-    if reference_color is not None:
+    if ref_color is not None:
         colors.to_csv(os.path.join(brightness_dir, "cell_colors.csv"), index=False)
     
     if logger:
@@ -292,17 +299,18 @@ def calculate_cell_brightness(image, mask, filepath, channel,
     im_masks = label_image(colormap_mask, object_ids, center_coords)
     im_masks.save(os.path.join(brightness_dir, "mask_colormap.png"))
 
-    colormap_mask = Image.fromarray(create_real_colormap_mask(mask, colors))
-    im_masks = label_image(colormap_mask, object_ids, center_coords)
-    im_masks.save(os.path.join(brightness_dir, "mask_real_colormap.png"))
+    if ref_color:
+        colormap_mask = Image.fromarray(create_real_colormap_mask(mask, colors))
+        im_masks = label_image(colormap_mask, object_ids, center_coords)
+        im_masks.save(os.path.join(brightness_dir, "mask_real_colormap.png"))
 
-    filtered_object_ids = data[data['excluded'] == False]['id'].values
-    filtered_mask = np.zeros_like(mask)
-    for obj_id in filtered_object_ids:
-        filtered_mask[mask == obj_id] = obj_id
-    colormap_mask = Image.fromarray(create_real_colormap_mask(filtered_mask, colors))
-    # im_masks = label_image(colormap_mask, filtered_object_ids, center_coords)
-    im_masks.save(os.path.join(brightness_dir, "filtered_mask_colormap.png"))
+        filtered_object_ids = data[data['excluded'] == False]['id'].values
+        filtered_mask = np.zeros_like(mask)
+        for obj_id in filtered_object_ids:
+            filtered_mask[mask == obj_id] = obj_id
+        colormap_mask = Image.fromarray(create_real_colormap_mask(filtered_mask, colors))
+        im_masks = label_image(colormap_mask, filtered_object_ids, center_coords)
+        im_masks.save(os.path.join(brightness_dir, "filtered_mask_colormap.png"))
 
     if logger:
         logger.info("Colormap is created")

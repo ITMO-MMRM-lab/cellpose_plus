@@ -6,7 +6,7 @@ import sys, os, pathlib, warnings, datetime, time, copy, math
 
 from qtpy import QtGui, QtCore
 from superqt import QRangeSlider, QCollapsible
-from qtpy.QtWidgets import QScrollArea, QMainWindow, QAction, QMenu, QApplication, QWidget, QScrollBar, QComboBox, QGridLayout, QPushButton, QFrame, QCheckBox, QLabel, QProgressBar, QLineEdit, QMessageBox, QGroupBox, QRadioButton, QButtonGroup, QHBoxLayout, QInputDialog
+from qtpy.QtWidgets import QSlider, QScrollArea, QMainWindow, QAction, QMenu, QApplication, QWidget, QScrollBar, QComboBox, QGridLayout, QPushButton, QFrame, QCheckBox, QLabel, QProgressBar, QLineEdit, QMessageBox, QGroupBox, QRadioButton, QButtonGroup, QHBoxLayout, QInputDialog
 import pyqtgraph as pg
 from qtpy.QtCore import QThread, Signal
 
@@ -484,7 +484,7 @@ class MainW(QMainWindow):
         self.SCheckBox.toggled.connect(self.autosave_on)
         self.SCheckBox.setEnabled(True)
         self.drawBoxG.addWidget(self.SCheckBox, b0, 0, 1, 5)
-
+                                                                                                                     
         # buttons for deleting multiple cells
         self.deleteBox = QGroupBox("delete multiple ROIs")
         self.deleteBox.setStyleSheet("color: rgb(200, 200, 200)")
@@ -968,14 +968,12 @@ class MainW(QMainWindow):
 
         ## Cell brightness
         b += 1
-        b0 += 1
         self.brightnessGroup = QGroupBox('Cell brightness / h-score')
         self.brightnessGroup.setFont(self.boldfont)
         self.brightnessGroup.setStyleSheet("QGroupBox { border: 1px solid white; color:white; padding: 10px 0px;}")
         self.brightnessGroupGrid = QGridLayout()
         self.brightnessGroup.setLayout(self.brightnessGroupGrid)
 
-        # Channel selection
         self.brightnessChannelDropdownLabel = QLabel("Channel:")
         self.brightnessChannelDropdownLabel.setFont(self.medfont)
         self.brightnessGroupGrid.addWidget(self.brightnessChannelDropdownLabel, 0, 0)
@@ -985,7 +983,6 @@ class MainW(QMainWindow):
         self.brightnessChannelDropdown.setFont(self.medfont)
         self.brightnessGroupGrid.addWidget(self.brightnessChannelDropdown, 0, 1, 1, 2)
 
-        # Source image selection
         self.brightnessImageSourceLabel = QLabel("Source:")
         self.brightnessImageSourceLabel.setFont(self.medfont)
         self.brightnessGroupGrid.addWidget(self.brightnessImageSourceLabel, 1, 0)
@@ -1003,25 +1000,76 @@ class MainW(QMainWindow):
         self.brightnessGroupGrid.addWidget(self.brightnessOriginalRadio, 1, 1)
         self.brightnessGroupGrid.addWidget(self.brightnessRestoredRadio, 1, 2)
 
-        # Background subtraction
         self.brightnessSubtractBackgroundCheckbox = QCheckBox("Subtract background")
         self.brightnessSubtractBackgroundCheckbox.setFont(self.medfont)
         self.brightnessSubtractBackgroundCheckbox.setChecked(True)
         self.brightnessGroupGrid.addWidget(self.brightnessSubtractBackgroundCheckbox, 2, 0, 1, 3)
         
-        # Calculate brightness button
+        # ==========================================================
+        # === Row 3: CheckBox (Exclude) + Button (Get Color) ===
+        # ==========================================================
+        row_exclude = 3
+        self.excluded = False
+        
+        self.AvgColorCheckBox = QCheckBox("ROI color to exclude:")
+        self.AvgColorCheckBox.setFont(self.medfont)
+        self.AvgColorCheckBox.setChecked(self.excluded)
+        self.brightnessGroupGrid.addWidget(self.AvgColorCheckBox, row_exclude, 0, 1, 2)
+        
+        def toggle_excluded(state):
+            self.excluded = state
+        self.AvgColorCheckBox.toggled.connect(toggle_excluded)
+
+        self.excluded_color = [255, 255, 255]
+        self.AvgColorBtn = QPushButton("Get color")
+        self.AvgColorBtn.setFont(self.medfont) 
+        self.AvgColorBtn.setStyleSheet(f"""
+            background-color: rgb({self.excluded_color[0]}, {self.excluded_color[1]}, {self.excluded_color[2]});
+            color: black;
+            font-weight: bold;
+        """)
+        self.AvgColorBtn.setText(f"R:{self.excluded_color[0]}, G:{self.excluded_color[1]}, B:{self.excluded_color[2]}")
+        self.AvgColorBtn.clicked.connect(self.get_selected_cell_mean_color) 
+        self.AvgColorBtn.setToolTip("Chose the mean color of selected cell")
+        # self.AvgColorBtn.setFixedWidth(90) # Лучше убрать фикс. ширину, чтобы кнопка растягивалась
+        self.brightnessGroupGrid.addWidget(self.AvgColorBtn, row_exclude, 2, 1, 1)
+
+        # ==========================================================
+        # === Row 4: Slider 0-100 + Label ===
+        # ==========================================================
+        row_slider = 4
+        self.excluded_percent = 10
+        
+        self.PercentSlider = QSlider(QtCore.Qt.Horizontal) 
+        self.PercentSlider.setRange(0, 100)
+        self.PercentSlider.setValue(self.excluded_percent)
+        self.brightnessGroupGrid.addWidget(self.PercentSlider, row_slider, 0, 1, 2)
+
+        self.SliderValueLbl = QLabel(str(self.excluded_percent)+'%')
+        self.SliderValueLbl.setFont(self.medfont)
+        self.SliderValueLbl.setAlignment(QtCore.Qt.AlignCenter) # Центрируем текст
+        self.brightnessGroupGrid.addWidget(self.SliderValueLbl, row_slider, 2, 1, 1)
+        
+        def change_percent(val):
+            self.excluded_percent = val
+            self.SliderValueLbl.setText(str(val)+'%')
+        self.PercentSlider.valueChanged.connect(change_percent)
+
+        # ==========================================================
+        # === Row 5: Calculate Button + Status ===
+        # ==========================================================
+        row_calc = 5
+        
         self.calculateBrightnessButton = QPushButton("Calculate")
         self.calculateBrightnessButton.clicked.connect(self.call_calculate_cell_brightness)
-        self.brightnessGroupGrid.addWidget(self.calculateBrightnessButton, 3, 0, 1, 1)
-        self.calculateBrightnessButton.setFont(self.smallfont)
+        self.calculateBrightnessButton.setFont(self.medfont)
+        self.brightnessGroupGrid.addWidget(self.calculateBrightnessButton, row_calc, 0, 1, 1)
 
-        # Brightness status label
         self.brightnessStatusLabel = QLabel("")
         self.brightnessStatusLabel.setFont(self.medfont)
-        self.brightnessGroupGrid.addWidget(self.brightnessStatusLabel, 3, 1, 1, 2)
-        
-        self.l0.addWidget(self.brightnessGroup, b, 0, 1, 9)
+        self.brightnessGroupGrid.addWidget(self.brightnessStatusLabel, row_calc, 1, 1, 2)
 
+        self.l0.addWidget(self.brightnessGroup, b, 0, 1, 9)
 
         ##
 
@@ -1363,6 +1411,94 @@ class MainW(QMainWindow):
         else:
             io._load_image(self, filename=files[0], load_seg=True, load_3D=self.load_3D)
 
+
+    def get_selected_cell_mean_color(self):
+        import numpy as np
+        
+        # 1. Проверка: выбрана ли клетка?
+        if not hasattr(self, 'selected') or self.selected == 0:
+            print("GUI: Сначала выделите клетку (кликните по ней)!")
+            return
+
+        idx = self.selected
+
+        # 2. Получаем данные (изображение и маски)
+        # Cellpose хранит данные в self.stack (или self.image) и self.cellpix
+        # Нужно учитывать Z-слой, если это 3D/TIFF
+        
+        try:
+            # Если есть Z-слайдер и многослойное изображение
+            if hasattr(self, 'currentZ') and self.cellpix.ndim == 3:
+                image_data = self.stack[self.currentZ]
+                mask_data = self.cellpix[self.currentZ]
+            else:
+                # Если 2D изображение
+                image_data = self.stack if hasattr(self, 'stack') else self.image
+                mask_data = self.cellpix
+        except Exception as e:
+            print(f"Ошибка доступа к данным изображения: {e}")
+            return
+
+        # 3. Находим пиксели, относящиеся к клетке
+        mask_bool = (mask_data == idx)
+
+        if not np.any(mask_bool):
+            print("Ошибка: Маска клетки не найдена на текущем слое.")
+            return
+
+        # Выбираем пиксели изображения по маске
+        # image_data может быть (Y, X) или (Y, X, Channels)
+        pixels = image_data[mask_bool]
+
+        # 4. Считаем среднее арифметическое
+        if pixels.ndim > 1: # Цветное (RGB)
+            mean_color = np.median(pixels, axis=0) # Среднее по колонкам RGB
+        else: # ЧБ
+            mean_color = np.median(pixels)
+
+        # 5. Подготовка цвета (RGB)
+        r, g, b = 0, 0, 0
+        
+        # Функция для конвертации в 0-255
+        def to_byte(val, max_val_in_img):
+            # Если картинка float (0.0 - 1.0), умножаем на 255
+            if max_val_in_img <= 1.5: 
+                return int(val * 255)
+            return int(val)
+
+        img_max = image_data.max() if image_data.size > 0 else 255
+
+        # Разбор каналов
+        if np.size(mean_color) >= 3: # RGB
+            r = to_byte(mean_color[0], img_max)
+            g = to_byte(mean_color[1], img_max)
+            b = to_byte(mean_color[2], img_max)
+        elif np.size(mean_color) == 2: # 2 канала (напр. ядро/цитоплазма)
+            r = to_byte(mean_color[0], img_max)
+            g = to_byte(mean_color[1], img_max)
+            b = 0
+        else: # 1 канал (Gray)
+            val = to_byte(mean_color, img_max)
+            r, g, b = val, val, val
+
+        # Ограничиваем 0-255
+        r, g, b = min(255, max(0, r)), min(255, max(0, g)), min(255, max(0, b))
+        self.excluded_color = [r, g, b]
+
+        # 6. Меняем стиль кнопки
+        # Выбираем цвет текста (контрастный)
+        text_col = "white" if (r + g + b) / 3 < 128 else "black"
+        
+        css = f"""
+            background-color: rgb({r}, {g}, {b});
+            color: {text_col};
+            font-weight: bold;
+        """
+        self.AvgColorBtn.setStyleSheet(css)
+        self.AvgColorBtn.setText(f"R:{r}, G:{g}, B:{b}")
+        print(f"Cell {idx} Mean Color -> R:{r} G:{g} B:{b}")
+
+
     def toggle_masks(self):
         if self.MCheckBox.isChecked():
             self.masksOn = True
@@ -1447,7 +1583,7 @@ class MainW(QMainWindow):
 
         # -- zero out image stack -- #
         self.opacity = 128  # how opaque masks should be
-        self.outcolor = [200, 200, 255, 200]
+        self.outcolor = [0, 0, 0, 255] # the pure black has a better visibilty
         self.NZ, self.Ly, self.Lx = 1, 224, 224
         self.saturation = []
         for r in range(3):
@@ -1546,6 +1682,21 @@ class MainW(QMainWindow):
         self.update_scale()
         self.update_layer()
 
+    def highlight_selected_cell(self, idx):
+        z = self.currentZ
+        cell_mask = (self.cellpix[z] == idx)
+        thickness = 2 
+        eroded_mask = ndimage.binary_erosion(cell_mask, iterations=thickness)
+        outline_mask = cell_mask ^ eroded_mask 
+        self.layerz[outline_mask] = np.array([self.outcolor[0], self.outcolor[1], self.outcolor[2], 255])
+        self.layerz[eroded_mask] = np.array([255, 255, 255, 0]) 
+
+        # The old way to highlight
+        # z = self.currentZ
+        # self.layerz[self.cellpix[z] == idx] = np.array(
+        #     [255, 255, 255, self.opacity])
+
+
     def select_cell(self, idx):
         self.prev_selected = self.selected
         self.selected = idx
@@ -1585,16 +1736,12 @@ class MainW(QMainWindow):
             print("Size in px: ", msr[1]["SolidArea"][0])
             print("Size in μm: ", round(msr[1]["SolidArea"][0] * pow(self.px_to_mm, 2), 2))
 
-            z = self.currentZ
-            self.layerz[self.cellpix[z] == idx] = np.array(
-                [255, 255, 255, self.opacity])
+            self.highlight_selected_cell(idx)
             self.update_layer()
 
     def select_cell_multi(self, idx):
         if idx > 0:
-            z = self.currentZ
-            self.layerz[self.cellpix[z] == idx] = np.array(
-                [255, 255, 255, self.opacity])
+            self.highlight_selected_cell(idx)
             self.update_layer()
 
     def unselect_cell(self):
@@ -2142,8 +2289,9 @@ class MainW(QMainWindow):
             self.layerz[..., 3] = self.opacity * (self.cellpix[self.currentZ]
                                                   > 0).astype(np.uint8)
             if self.selected > 0:
-                self.layerz[self.cellpix[self.currentZ] == self.selected] = np.array(
-                    [255, 255, 255, self.opacity])
+                self.highlight_selected_cell(self.selected)
+                # self.layerz[self.cellpix[self.currentZ] == self.selected] = np.array(
+                #     [255, 255, 255, self.opacity])
             cZ = self.currentZ
             stroke_z = np.array([s[0][0] for s in self.strokes])
             inZ = np.nonzero(stroke_z == cZ)[0]
@@ -2826,6 +2974,9 @@ class MainW(QMainWindow):
                                                                    self.filename, 
                                                                    self.brightnessChannelDropdown.currentIndex(),
                                                                    self.brightnessSubtractBackgroundCheckbox.isChecked(),
+                                                                   self.excluded,
+                                                                   self.excluded_color,
+                                                                   self.excluded_percent,
                                                                    self.logger)
         
         self.calculateBrightnessThread.update_status.connect(self.update_brightness_calculation_status)
@@ -2842,13 +2993,16 @@ class MainW(QMainWindow):
 class CalculateBrightnessThread(QThread):
     update_status = Signal(str)
 
-    def __init__(self, stack, cellpix, filename, brightness_channel, subtract_background, logger):
+    def __init__(self, stack, cellpix, filename, brightness_channel, subtract_background, excluded, excluded_color, excluded_percent, logger):
         super().__init__()
         self.stack = stack
         self.cellpix = cellpix
         self.filename = filename
         self.brightness_channel = brightness_channel
         self.subtract_background = subtract_background
+        r, g, b = excluded_color[0], excluded_color[1], excluded_color[2]
+        self.excluded_color = (r, g, b) if excluded else None
+        self.excluded_percent = excluded_percent if excluded else None
         self.logger = logger
 
     def run(self):
@@ -2858,6 +3012,8 @@ class CalculateBrightnessThread(QThread):
                                                       self.filename, 
                                                       self.brightness_channel,
                                                       self.subtract_background,
+                                                      self.excluded_color,
+                                                      self.excluded_percent,
                                                       logger=self.logger)
             self.update_status.emit(status)
         except Exception as e:
