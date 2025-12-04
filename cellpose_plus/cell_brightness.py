@@ -54,12 +54,12 @@ def calculate_brightness_values(image, mask, channel, subtract_background=True,
             average_r = int(np.median(image[:, :, 0][obj_mask]))
             average_g = int(np.median(image[:, :, 1][obj_mask]))
             average_b = int(np.median(image[:, :, 2][obj_mask]))
-            if logger:
-                logger.info(f"Median color RGB:{(average_r, average_g, average_b)} of cell ID:{obj_id}")
+            # if logger:
+            #     logger.info(f"Median color RGB:{(average_r, average_g, average_b)} of cell ID:{obj_id}")
             cell_color = (average_r, average_g, average_b)
             average_h, average_s, average_v = rgb_to_hsv(cell_color)
-            if logger:
-                logger.info(f"Average color HSV:{(average_h, average_s, average_v)} of cell ID:{obj_id}")
+            # if logger:
+            #     logger.info(f"Average color HSV:{(average_h, average_s, average_v)} of cell ID:{obj_id}")
             hsv_cell_color = (average_h, average_s, average_v)
 
             # Check if cell color is within ref_color_threshold threshold for RGB
@@ -85,6 +85,10 @@ def calculate_brightness_values(image, mask, channel, subtract_background=True,
                 'V': average_v, 
                 'hsvExcluded': hsv_excluded,
             })
+
+        if logger:
+            logger.info(f"Average color is calculated")
+
 
         if len(filtered_object_ids) == 0:
             return None, None, None
@@ -298,22 +302,32 @@ def calculate_cell_brightness(image, mask, filepath, channel,
     colormap_mask = Image.fromarray(create_colormap_mask(mask))
     im_masks = label_image(colormap_mask, object_ids, center_coords)
     im_masks.save(os.path.join(brightness_dir, "mask_colormap.png"))
+    if logger:
+        logger.info("Colormap is created")
 
     if ref_color:
         colormap_mask = Image.fromarray(create_real_colormap_mask(mask, colors))
+        logger.info("Filtered1")
         im_masks = label_image(colormap_mask, object_ids, center_coords)
+        logger.info("Filtered2")
         im_masks.save(os.path.join(brightness_dir, "mask_real_colormap.png"))
+        if logger:
+            logger.info("Real colormap is created")
 
         filtered_object_ids = data[data['excluded'] == False]['id'].values
+        logger.info("Filtered3")
         filtered_mask = np.zeros_like(mask)
+        logger.info("Filtered4")
         for obj_id in filtered_object_ids:
             filtered_mask[mask == obj_id] = obj_id
+        logger.info("Filtered5")
         colormap_mask = Image.fromarray(create_real_colormap_mask(filtered_mask, colors))
+        logger.info("Filtered6")
         im_masks = label_image(colormap_mask, filtered_object_ids, center_coords)
+        logger.info("Filtered7")
         im_masks.save(os.path.join(brightness_dir, "filtered_mask_colormap.png"))
-
-    if logger:
-        logger.info("Colormap is created")
+        if logger:
+            logger.info("Filtered colormap is created")
     
     # Create and save brightness visualization map
     brightness_image = create_brightness_visualization(brightness_map, data, center_coords)
@@ -452,25 +466,37 @@ def calculate_h_score_values(data):
     :return: tuple (h_score, strong_ratio, mean_ratio, weak_ratio, result DataFrame)
     """
     # Count for intensity
-    counts_intensity = data['intensity'].value_counts()
     total_count = len(data)
 
     # Counting ratios
+    counts_intensity = data['intensity'].value_counts()
     strong_count = counts_intensity.get('strong', 0)
     mean_count = counts_intensity.get('mean', 0)
     weak_count = counts_intensity.get('weak', 0)
 
-    strong_ratio = strong_count / total_count * 100 if total_count > 0 else 0
-    mean_ratio = mean_count / total_count * 100 if total_count > 0 else 0
-    weak_ratio = weak_count / total_count * 100 if total_count > 0 else 0
+    valid_data = data[data['excluded'] == False]
+    valid_counts_intensity = valid_data['intensity'].value_counts()
+    valid_strong_count = valid_counts_intensity.get('strong', 0)
+    valid_mean_count = valid_counts_intensity.get('mean', 0)
+    valid_weak_count = valid_counts_intensity.get('weak', 0)
+
+    strong_ratio = valid_strong_count / total_count * 100 if total_count > 0 else 0
+    mean_ratio = valid_mean_count / total_count * 100 if total_count > 0 else 0
+    weak_ratio = valid_weak_count / total_count * 100 if total_count > 0 else 0
         
     # Counting H-score
     h_score = 1 * weak_ratio + 2 * mean_ratio + 3 * strong_ratio
 
+    total_excluded = total_count - valid_strong_count - valid_mean_count - valid_weak_count
+    weak_excluded = weak_count-valid_weak_count
+    mean_excluded = mean_count-valid_mean_count
+    strong_excluded = strong_count-valid_strong_count
+
     result = {
         'metric': ['h_score', 'weak', 'mean', 'strong'],
         'value': [h_score, weak_ratio, mean_ratio, strong_ratio],
-        'count': [total_count, weak_count, mean_count, strong_count]
+        'count': [total_count, valid_weak_count, valid_mean_count, valid_strong_count],
+        'out_of_range': [total_excluded, weak_excluded, mean_excluded, strong_excluded]
     }
 
     return h_score, strong_ratio, mean_ratio, weak_ratio, pd.DataFrame(result)
