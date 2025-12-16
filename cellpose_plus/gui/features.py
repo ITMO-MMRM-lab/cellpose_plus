@@ -194,12 +194,10 @@ class FeatureExtraction():
         return im_cyto, im_nuclei, im_overlap
 
     def find_overlap(self, cyto_mask, nuclei_mask, cyto_nuclei_indices):
-        count = 0
-        for idxi in range(0, cyto_mask.shape[0]):
-            for idxj in range(0, cyto_mask.shape[1]):
-                if cyto_mask[idxi][idxj] == cyto_nuclei_indices[0] and nuclei_mask[idxi][idxj] == cyto_nuclei_indices[1]:
-                    count += 1
-        return count
+        return np.sum(
+            (cyto_mask == cyto_nuclei_indices[0]) &
+            (nuclei_mask == cyto_nuclei_indices[1])
+        )
 
     def matched_indices(self, cyto_mask, nuclei_mask, cyto_size, nuclei_size, main_coords):
         tmp_cyto = np.copy(cyto_mask) #.astype(np.uint8)
