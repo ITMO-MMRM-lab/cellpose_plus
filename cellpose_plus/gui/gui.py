@@ -958,6 +958,29 @@ class MainW(QMainWindow):
 
         # calculate the selected metrics
         self.CalculateButton = QPushButton(u'calculate')
+
+        # New calculate micronulceus
+        self.micronucleusThresholdLabel = QLabel("Threshold (µm2):")
+        self.micronucleusThresholdLabel.setFont(self.medfont)
+        self.MBg.addWidget(self.micronucleusThresholdLabel, 3, 0, 1, 4)
+        self.micronucleusThresholdEdit = QLineEdit("40")
+        self.micronucleusThresholdEdit.setFont(self.medfont)
+        self.micronucleusThresholdEdit.setFixedWidth(60)
+        self.MBg.addWidget(self.micronucleusThresholdEdit, 3, 4, 1, 3)
+
+        self.calculateMicronucleusButton = QPushButton("Calculate Micronucleus")
+        self.calculateMicronucleusButton.setFont(self.medfont)
+        self.calculateMicronucleusButton.setToolTip(f"Bound masks smaller than {self.micronucleusThresholdEdit.text()} µm2") 
+        self.calculateMicronucleusButton.clicked.connect(self.calculate_micronucleus)
+        self.MBg.addWidget(self.calculateMicronucleusButton, 2, 0, 1, 7)
+
+        self.micronucleusThresholdEdit.textChanged.connect(self.updateMicronucleusTooltip)
+
+        self.MicronucleusLabel = QLabel("Micronuclei: 0 (0%)")
+        self.MicronucleusLabel.setFont(self.boldmedfont)
+        self.MBg.addWidget(self.MicronucleusLabel, 2, 7, 1, 5)
+
+
         self.CalculateButton.clicked.connect(lambda: self.features_class.calculate_metrics(self))
         self.MBg.addWidget(self.CalculateButton, 0, 10, 1, 2)
         self.CalculateButton.setEnabled(False)
@@ -1963,6 +1986,77 @@ class MainW(QMainWindow):
     def update_roi_count(self):
         self.roi_count.setText(f"{self.ncells} ROIs")
 
+    def calculate_micronucleus(self):
+        
+        z = getattr(self, "currentZ", 0)
+        pred_mask = np.copy(self.cellpix[z])
+
+        if pred_mask.ndim > 2:
+            pred_mask = np.squeeze(pred_mask)
+
+        um_per_px = self.px_to_mm ### ?
+
+        unique_labels = np.unique(pred_mask)
+        unique_labels = unique_labels[unique_labels > 0]
+
+        areas_um = {lid: np.sum(pred_mask == lid) * (um_per_px ** 2) for lid in unique_labels}
+        try:
+            threshold = float(self.micronucleusThresholdEdit.text())
+        except:
+            threshold = 40.0
+            self.micronucleusThresholdEdit.setText("40")
+
+        nuc_ids = [lid for lid, area in areas_um.items() if area < threshold]
+
+        total = len(unique_labels)
+        nuc_percent = len(nuc_ids) / total * 100 if total > 0 else 0
+
+        if self.layerz is not None:
+
+            if not hasattr(self, "original_layerz"):
+                self.original_layerz = np.copy(self.layerz)
+
+            layer = np.copy(self.original_layerz)
+
+            color = np.array([255, 0, 0, 255], dtype=np.uint8)
+            
+            for lid in nuc_ids:
+                yx = np.argwhere(pred_mask == lid)
+                if len(yx) == 0:
+                    continue
+
+                y_min, x_min = np.min(yx, axis=0)
+                y_max, x_max = np.max(yx, axis=0)
+                expand = 2
+                y_min = max(0, y_min - expand)
+                x_min = max(0, x_min - expand)
+                y_max = min(layer.shape[0] - 1, y_max + expand)
+                x_max = min(layer.shape[1] - 1, x_max + expand)
+                
+                layer[y_min, x_min:x_max+1] = color
+
+                layer[y_max, x_min:x_max+1] = color
+  
+                layer[y_min:y_max+1, x_min] = color
+
+                layer[y_min:y_max+1, x_max] = color
+
+            self.layerz = layer
+            self.update_layer()
+
+        # print(f"Micronuclei: {len(nuc_ids)} / {total} ({nuc_percent:.1f}%) < 40 µm2")
+
+        self.MicronucleusLabel.setText(f"Micronuclei: {len(nuc_ids)} ({nuc_percent:.1f}%)")
+        
+    def updateMicronucleusTooltip(self):
+        text = self.micronucleusThresholdEdit.text()
+        if text.strip() == "":
+            text = "?"
+        self.calculateMicronucleusButton.setToolTip(
+            f"Bound masks smaller than {text} µm2"
+        )    
+
+        
     def add_set(self):
         if len(self.current_point_set) > 0:
             while len(self.strokes) > 0:
