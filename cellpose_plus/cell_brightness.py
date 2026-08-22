@@ -307,24 +307,17 @@ def calculate_cell_brightness(image, mask, filepath, channel,
 
     if ref_color:
         colormap_mask = Image.fromarray(create_real_colormap_mask(mask, colors))
-        logger.info("Filtered1")
         im_masks = label_image(colormap_mask, object_ids, center_coords)
-        logger.info("Filtered2")
         im_masks.save(os.path.join(brightness_dir, "mask_real_colormap.png"))
         if logger:
             logger.info("Real colormap is created")
 
         filtered_object_ids = data[data['excluded'] == False]['id'].values
-        logger.info("Filtered3")
-        filtered_mask = np.zeros_like(mask)
-        logger.info("Filtered4")
-        for obj_id in filtered_object_ids:
-            filtered_mask[mask == obj_id] = obj_id
-        logger.info("Filtered5")
-        colormap_mask = Image.fromarray(create_real_colormap_mask(filtered_mask, colors))
-        logger.info("Filtered6")
-        im_masks = label_image(colormap_mask, filtered_object_ids, center_coords)
-        logger.info("Filtered7")
+        filtered_colors = colors[colors['id'].isin(filtered_object_ids)]
+        id_to_coord = dict(zip(data['id'].values, center_coords))
+        filtered_coords = [id_to_coord[obj_id] for obj_id in filtered_object_ids]
+        colormap_mask = Image.fromarray(create_real_colormap_mask(mask, filtered_colors))
+        im_masks = label_image(colormap_mask, filtered_object_ids, filtered_coords)
         im_masks.save(os.path.join(brightness_dir, "filtered_mask_colormap.png"))
         if logger:
             logger.info("Filtered colormap is created")
@@ -397,35 +390,41 @@ def create_colormap_mask(mask):
 
 def create_real_colormap_mask(mask, colors):
     """
-    Creates a colormap mask using real colors from the colors DataFrame.
+    Creates a colormap mask using real colors from the colors DataFrame using vectorized lookup.
     
     :param mask: mask numpy array
     :param colors: DataFrame with columns 'id', 'R', 'G', 'B'
     :return: colored mask array
     """
-    # Create output array with RGBA channels
-    layerz = np.zeros((mask.shape[0], mask.shape[1], 4), np.uint8)
+    # Find "max id" in mask
+    max_id = int(mask.max())
+
+    # Lookup Table (LUT) - table of colors
+    # Size: (max_id + 1, 4 channels RGBA)
+    lut = np.zeros((max_id + 1, 4), dtype=np.uint8)
+
+    # Default background
+    # RGB = 255 (wite), A = 0 (transparent)
+    lut[:, :3] = 255 
+    lut[:, 3] = 0
+
+    ids = colors['id'].values.astype(int)
+    # Filter just in case
+    valid_mask = ids <= max_id
+    ids = ids[valid_mask]
     
-    # Set background to white
-    layerz[..., :3] = 255
-    layerz[..., 3] = 0  # Transparent background
-    
-    # Apply colors for each cell
-    for _, row in colors.iterrows():
-        obj_id = int(row['id'])
-        r = int(row['R'])
-        g = int(row['G'])
-        b = int(row['B'])
-        
-        # Find pixels belonging to this cell
-        cell_mask = (mask == obj_id)
-        
-        # Apply color to these pixels
-        layerz[cell_mask, 0] = r
-        layerz[cell_mask, 1] = g
-        layerz[cell_mask, 2] = b
-        layerz[cell_mask, 3] = 255  # Opaque for cells
-    
+    if len(ids) > 0:
+        rs = colors['R'].values[valid_mask].astype(np.uint8)
+        gs = colors['G'].values[valid_mask].astype(np.uint8)
+        bs = colors['B'].values[valid_mask].astype(np.uint8)
+
+        lut[ids, 0] = rs
+        lut[ids, 1] = gs
+        lut[ids, 2] = bs
+        lut[ids, 3] = 255  # not transparent
+
+    layerz = lut[mask]
+
     return layerz
 
 def label_image(image, values, coords, color=(255, 255, 255)):
@@ -447,9 +446,9 @@ def label_image(image, values, coords, color=(255, 255, 255)):
 
 def classify_intensity(brightness):
     BRIGHTNESS_RANGES = (
-        ("strong", (34, 115)),
-        ("mean", (115, 147)),
-        ("weak", (147, 191))
+        ("strong", (34, 120)),
+        ("mean", (120, 180)),
+        ("weak", (180, 200))
     )
 
     for level, (low, high) in BRIGHTNESS_RANGES:
